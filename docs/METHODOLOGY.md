@@ -88,10 +88,12 @@ line item lifted from the financial statements, not a company-computed metric:
           R_Au  - OpCost_Au        (cost of sales EXCLUDING DD&A, gold segment)
                 - Royalties_Au     (royalties & production taxes)
                 - CorpG&A_Au       (allocated, see §7)
-                - Explor_Au        (ALL exploration - sustaining and greenfield)
+                - Explor_Au        (EXPENSED exploration ONLY - capitalised
+                                    exploration already sits inside Capex_Au)
                 - Capex_Au         (TOTAL capex from the cash flow statement,
                                     sustaining AND growth - no split required)
-                - Reclam_Au        (reclamation accretion + ARC amortisation)
+                - Reclam_Au        (accretion + ARC amortisation - ONLY where not already
+                                    bundled inside finance costs; see non-overlap rule)
                 - Lease_Au         (lease principal + financing component)
                 - NetInt_Au        (interest expense - interest income, incl. capitalised)
                 - CashTax_Au       (cash taxes PAID, not the P&L charge)
@@ -313,3 +315,25 @@ method, it is an assertion.
 2. Verify hedge-book history (Barrick Q3 2009 close, AngloGold 2010) and quantify realised-vs-spot gaps 2005–2010.
 3. Montana Tech theses on AISC construction — HTTP 403, need institutional access.
 4. S&P Global Market Intelligence — how far back does their gold AISC series run, and is any of it backcast?
+
+
+## 13. Two non-negotiable arithmetic rules (found in Round 1, not theory)
+
+**Rule 1 — the cost stack must be EXHAUSTIVE AND NON-OVERLAPPING.**
+Round 1 caught two real double-counts in the formula as first drafted:
+- `exploration_total` + `capex_total`: capitalised exploration sits inside capex. Agnico 2026Q2
+  proves it — sustaining capex 236,950 + sustaining cap.expl. 8,843 + development capex 462,274 +
+  development cap.expl. 92,853 + WC adj 8,335 = additions to PP&MD 809,255. Subtracting an
+  all-in exploration figure as well double-charges $101,696k = **2.7 points of gold revenue**.
+  → `exploration_total` is the EXPENSED line only.
+- `net_interest` + `reclamation_accretion`: Agnico's `Finance costs` is a gross bundle already
+  containing reclamation accretion and lease interest. Subtracting accretion again double-charges it.
+  → where a component is bundled into another captured line, it is NOT taken separately. Record null,
+  not zero.
+
+**Rule 2 — the checksum is a checksum, not an anchor.**
+Reconstruct whichever all-in figure the company actually published for that period and tie to it.
+**If AIC is not published, use AISC. If neither, skip the check and flag it.** The purpose is only
+to prove we read the filing correctly. Barrick stopped publishing AIC after 2024Q2 and co-product
+after 2025Q3 — that is not a methodology problem, it just means AISC is the tie-out for those
+quarters. Never self-compute a figure and then "verify" against it.
