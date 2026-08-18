@@ -1,0 +1,1071 @@
+<title>金衡台</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #f6f4ee;
+    --surface:   #fcfbf7;
+    --ink:       #171511;
+    --ink-2:     #55524a;
+    --muted:     #8b8779;
+    --grid:      #e5e2d7;
+    --axis:      #c6c2b3;
+    --border:    rgba(23,21,17,.10);
+    --accent:    #b57e00;      /* 金 */
+    --accent-soft: rgba(181,126,0,.12);
+    --blue:      #2a78d6;      /* GVZ */
+    --aqua:      #1baf7a;      /* HV */
+    --violet:    #4a3aa7;      /* TIPS */
+    --up:        #d03b3b;      /* 红涨 */
+    --down:      #0a8a0a;      /* 绿跌 */
+    --crit:      #d03b3b;
+    --good:      #0ca30c;
+    --warn:      #b57e00;
+    --tooltip-bg: #23211b;
+    --tooltip-ink: #f5f3ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg:        #12110d;
+      --surface:   #1b1914;
+      --ink:       #f2efe4;
+      --ink-2:     #c6c2b3;
+      --muted:     #8b8779;
+      --grid:      #2c2a23;
+      --axis:      #3c3930;
+      --border:    rgba(255,255,255,.10);
+      --accent:    #eda100;
+      --accent-soft: rgba(237,161,0,.14);
+      --blue:      #3987e5;
+      --aqua:      #22c087;
+      --violet:    #9085e9;
+      --up:        #e66767;
+      --down:      #2fb42f;
+      --crit:      #e66767;
+      --good:      #2fb42f;
+      --warn:      #eda100;
+      --tooltip-bg: #f2efe4;
+      --tooltip-ink: #1b1914;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:        #12110d;
+    --surface:   #1b1914;
+    --ink:       #f2efe4;
+    --ink-2:     #c6c2b3;
+    --muted:     #8b8779;
+    --grid:      #2c2a23;
+    --axis:      #3c3930;
+    --border:    rgba(255,255,255,.10);
+    --accent:    #eda100;
+    --accent-soft: rgba(237,161,0,.14);
+    --blue:      #3987e5;
+    --aqua:      #22c087;
+    --violet:    #9085e9;
+    --up:        #e66767;
+    --down:      #2fb42f;
+    --crit:      #e66767;
+    --good:      #2fb42f;
+    --warn:      #eda100;
+    --tooltip-bg: #f2efe4;
+    --tooltip-ink: #1b1914;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    position: sticky; top: 0; z-index: 30;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar {
+    max-width: 1280px; margin: 0 auto; padding: 10px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand h1 { font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+  .brand .sym { font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+  .mock-badge {
+    font-size: 11px; letter-spacing: .1em; color: var(--warn);
+    border: 1px solid var(--warn); border-radius: 3px; padding: 1px 6px;
+  }
+  .tabs { display: flex; gap: 4px; margin-left: auto; }
+  .tabs button {
+    font: inherit; font-weight: 500; color: var(--ink-2);
+    background: none; border: none; border-radius: 6px;
+    padding: 6px 14px; cursor: pointer;
+  }
+  .tabs button:hover { background: var(--accent-soft); }
+  .tabs button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .theme-btn {
+    font: inherit; font-size: 12px; color: var(--muted);
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; cursor: pointer;
+  }
+  .theme-btn:hover { color: var(--ink); }
+  button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ---------- 布局 ---------- */
+  main { max-width: 1280px; margin: 0 auto; padding: 16px 20px 48px; }
+  .board { display: none; }
+  .board.on { display: block; }
+  .grid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  .grid .wide { grid-column: 1 / -1; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px 12px;
+    min-width: 0;
+  }
+  .card-head {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .card-head h2 { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .card-head .sub { font-size: 12px; color: var(--muted); }
+  .card-head .ctrl { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  /* 分段控件 */
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 12px; color: var(--ink-2);
+    background: none; border: none; padding: 4px 10px; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+  .chk input { accent-color: var(--accent); }
+
+  /* ---------- KPI ---------- */
+  .kpis {
+    display: grid; gap: 10px;
+    grid-template-columns: repeat(6, 1fr);
+    margin-bottom: 14px;
+  }
+  @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 560px)  { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .kpi .lbl { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+  .kpi .val { font-size: 22px; font-weight: 600; margin-top: 2px; }
+  .kpi .val.hero { font-size: 26px; }
+  .kpi .delta { font-size: 12px; margin-top: 1px; }
+  .kpi .delta.up { color: var(--up); }
+  .kpi .delta.down { color: var(--down); }
+  .kpi .note { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  @keyframes flashUp   { 0% { color: var(--up); }   100% { color: var(--ink); } }
+  @keyframes flashDown { 0% { color: var(--down); } 100% { color: var(--ink); } }
+  .kpi .val.f-up   { animation: flashUp .9s ease-out; }
+  .kpi .val.f-down { animation: flashDown .9s ease-out; }
+  @media (prefers-reduced-motion: reduce) {
+    .kpi .val.f-up, .kpi .val.f-down { animation: none; }
+  }
+  .meter { height: 6px; border-radius: 3px; background: var(--accent-soft); margin-top: 8px; overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+
+  /* ---------- 图表 ---------- */
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; }
+  .tooltip {
+    position: fixed; z-index: 50; pointer-events: none;
+    background: var(--tooltip-bg); color: var(--tooltip-ink);
+    border-radius: 6px; padding: 7px 10px;
+    font-size: 12px; line-height: 1.55; white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+    display: none;
+  }
+  .tooltip .t-head { font-weight: 600; margin-bottom: 2px; }
+  .tooltip .row { display: flex; gap: 12px; justify-content: space-between; }
+  .tooltip .k { opacity: .7; }
+
+  .legend { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+  .legend .it { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .sw { width: 14px; height: 3px; border-radius: 2px; }
+  .legend .sw.dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* 回撤分布行 */
+  .dist-row { display: grid; grid-template-columns: 44px 1fr 150px; gap: 12px; align-items: center; padding: 7px 0; }
+  .dist-row + .dist-row { border-top: 1px solid var(--grid); }
+  .dist-row .g-lbl { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+  .dist-row .g-lbl small { display: block; font-weight: 400; color: var(--muted); }
+  .dist-row .cur { font-size: 12px; text-align: right; }
+  .dist-row .cur b { font-size: 15px; }
+  .dist-row .cur .p { color: var(--accent); font-weight: 600; }
+  @media (max-width: 560px) { .dist-row { grid-template-columns: 36px 1fr 110px; } }
+
+  /* MDD 条 */
+  .mdd-row { display: grid; grid-template-columns: 52px 1fr 64px; gap: 10px; align-items: center; padding: 6px 0; }
+  .mdd-row .lbl { font-size: 12px; color: var(--ink-2); }
+  .mdd-row .bar { height: 16px; border-radius: 0 4px 4px 0; background: var(--crit); opacity: .85; min-width: 2px; transition: width .3s ease; }
+  @media (prefers-reduced-motion: reduce) { .mdd-row .bar { transition: none; } }
+  .mdd-row .v { font-size: 13px; font-weight: 600; text-align: right; }
+
+  /* 风控卡内的表单 */
+  .calc { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 700px) { .calc { grid-template-columns: 1fr; } }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input[type=number] {
+    font: inherit; font-size: 15px; color: var(--ink);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; width: 140px;
+  }
+  .field input[type=range] { width: 100%; accent-color: var(--accent); }
+  .stop-vals { display: flex; gap: 24px; margin-top: 4px; }
+  .stop-vals .sv .lbl { font-size: 11px; color: var(--muted); }
+  .stop-vals .sv .v { font-size: 20px; font-weight: 600; }
+  .pill { display: inline-block; font-size: 11px; border-radius: 10px; padding: 1px 8px; font-weight: 600; }
+  .pill.ok   { background: var(--accent-soft); color: var(--good); }
+  .pill.bad  { background: var(--accent-soft); color: var(--crit); }
+
+  /* 告警 */
+  .alert-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .alert-row + .alert-row { border-top: 1px solid var(--grid); }
+  .alert-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .alert-row .dot.hit { background: var(--crit); }
+  .alert-row .dot.idle { background: var(--axis); }
+  .alert-row .a-main { flex: 1; min-width: 0; }
+  .alert-row .a-name { font-size: 13px; }
+  .alert-row .a-name .st { font-size: 11px; margin-left: 6px; }
+  .alert-row .a-name .st.hit { color: var(--crit); font-weight: 600; }
+  .alert-row .a-name .st.idle { color: var(--muted); }
+  .alert-row .a-sub { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+  .alert-row .a-sub input {
+    font: inherit; font-size: 11px; width: 52px; color: var(--ink-2);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 4px;
+  }
+  .switch { position: relative; width: 30px; height: 17px; flex: none; }
+  .switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .switch i {
+    position: absolute; inset: 0; border-radius: 9px; background: var(--axis); transition: background .15s;
+    pointer-events: none;
+  }
+  .switch i::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+    border-radius: 50%; background: var(--surface); transition: left .15s;
+  }
+  .switch input:checked + i { background: var(--accent); }
+  .switch input:checked + i::after { left: 15px; }
+  @media (prefers-reduced-motion: reduce) { .switch i, .switch i::after { transition: none; } }
+
+  footer { max-width: 1280px; margin: 0 auto; padding: 0 20px 32px; font-size: 12px; color: var(--muted); }
+</style>
+
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <h1>金衡台</h1>
+      <span class="sym">XAU / USD</span>
+      <span class="mock-badge">MOCK 原型</span>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="on" data-board="main">主看板</button>
+      <button data-board="risk">风控 · 止损</button>
+    </nav>
+    <button class="theme-btn" id="themeBtn" title="切换明暗主题">主题</button>
+  </div>
+</header>
+
+<main>
+  <!-- ================= 主看板 ================= -->
+  <section class="board on" id="board-main">
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="lbl">现价 · 实时</div>
+        <div class="val hero num" id="kPrice">—</div>
+        <div class="delta num" id="kDelta">—</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">今日区间</div>
+        <div class="val num" id="kRange" style="font-size:16px; margin-top:6px;">—</div>
+        <div class="note num" id="kOpen">—</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">ATR (14d)</div>
+        <div class="val num" id="kAtr">—</div>
+        <div class="note num" id="kAtrPct">—</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">GVZ 隐含波动率</div>
+        <div class="val num">18.4</div>
+        <div class="delta up num">+1.2 较昨日</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">HV20 实现波动率</div>
+        <div class="val num">14.2<small style="font-size:13px;">%</small></div>
+        <div class="note">隐含溢价 +4.2pt</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">GVZ 一年分位</div>
+        <div class="val num">P72</div>
+        <div class="meter"><i style="width:72%"></i></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- A + B 价格与溢价 -->
+      <div class="card wide">
+        <div class="card-head">
+          <h2>价格 与 成本溢价率</h2>
+          <span class="sub" id="priceSub">当日 · 1 分钟</span>
+          <div class="ctrl">
+            <label class="chk" id="costChkWrap" title="成本价线仅在日线视图可用">
+              <input type="checkbox" id="costChk" checked> 成本价线
+            </label>
+            <div class="seg" id="granSeg">
+              <button data-g="1m" class="on">1m · 当日</button>
+              <button data-g="5m">5m · 五日</button>
+              <button data-g="1d">日线 · 一年</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart" id="candleChart"></div>
+        <div class="card-head" style="margin-top:10px;">
+          <h2 style="color:var(--ink-2); font-weight:500;">成本溢价率 <span class="sub">现价 ÷ 当季成本价 − 1 · 成本价每季度更新</span></h2>
+          <div class="ctrl"><span class="sub num" id="premNow">—</span></div>
+        </div>
+        <div class="chart" id="premChart"></div>
+      </div>
+
+      <!-- C 回撤分布 -->
+      <div class="card">
+        <div class="card-head">
+          <h2>回撤分布定位</h2>
+          <span class="sub">当前窗口 MDD 在全历史分布中的百分位</span>
+        </div>
+        <div id="distRows"></div>
+        <p class="sub" style="margin-top:8px; font-size:11px; color:var(--muted);">
+          直方图 = 全历史滚动窗口最大回撤分布，▼ = 当前窗口落点。分位越高，本轮回撤越罕见。
+        </p>
+      </div>
+
+      <!-- D 波动率 -->
+      <div class="card">
+        <div class="card-head">
+          <h2>隐含 vs 实现波动率</h2>
+          <div class="ctrl">
+            <div class="seg" id="hvSeg">
+              <button data-hv="7">HV7</button>
+              <button data-hv="20" class="on">HV20</button>
+              <button data-hv="60">HV60</button>
+            </div>
+            <div class="seg" id="volWinSeg">
+              <button data-w="63">3M</button>
+              <button data-w="252" class="on">1Y</button>
+              <button data-w="756">3Y</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart" id="volChart"></div>
+        <div class="legend" style="margin-top:6px;">
+          <span class="it"><span class="sw" style="background:var(--blue)"></span>GVZ 隐含</span>
+          <span class="it" id="hvLegend"><span class="sw" style="background:var(--aqua)"></span>HV20 实现</span>
+          <span class="it"><span class="sw" style="background:var(--blue); opacity:.18; height:10px;"></span>隐含 &gt; 实现（避险溢价）</span>
+        </div>
+      </div>
+
+      <!-- E 宏观 -->
+      <div class="card wide">
+        <div class="card-head">
+          <h2>实际利率 与 金价</h2>
+          <span class="sub">TIPS 10Y · 一年 · 同一时间轴上下并列（联动光标）</span>
+        </div>
+        <div class="chart" id="macroChart"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 风控看板 ================= -->
+  <section class="board" id="board-risk">
+    <div class="grid">
+
+      <!-- 止损计算 -->
+      <div class="card wide">
+        <div class="card-head">
+          <h2>ATR 止损模拟</h2>
+          <span class="sub">拖动倍数、输入持仓成本，全部实时联动（mock）</span>
+        </div>
+        <div class="calc">
+          <div>
+            <div class="field">
+              <label>ATR 倍数 <b class="num" id="atrKLbl" style="color:var(--accent);">1.5×</b>（1.0 – 3.0）</label>
+              <input type="range" id="atrK" min="1" max="3" step="0.1" value="1.5">
+            </div>
+            <div class="stop-vals">
+              <div class="sv"><div class="lbl">多头止损</div><div class="v num" id="stopLong">—</div></div>
+              <div class="sv"><div class="lbl">空头止损</div><div class="v num" id="stopShort">—</div></div>
+              <div class="sv"><div class="lbl">止损距离</div><div class="v num" id="stopDist">—</div></div>
+            </div>
+            <hr style="border:none; border-top:1px solid var(--grid); margin:14px 0;">
+            <div class="field">
+              <label>持仓方向</label>
+              <div class="seg" id="dirSeg">
+                <button data-d="long" class="on">多</button>
+                <button data-d="short">空</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>持仓成本价</label>
+              <input type="number" id="costIn" value="3350" step="1" class="num">
+            </div>
+            <div style="font-size:13px;">
+              浮动盈亏 <b class="num" id="pnl">—</b>
+              距止损 <b class="num" id="toStop">—</b>
+              <span id="ddJudge"></span>
+            </div>
+          </div>
+          <div>
+            <div class="sub" style="margin-bottom:4px;">近 60 日收盘 + 止损位</div>
+            <div class="chart" id="stopChart"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MDD -->
+      <div class="card">
+        <div class="card-head">
+          <h2>滚动最大回撤</h2>
+          <span class="sub">窗口对比 · 悬停看区间</span>
+        </div>
+        <div id="mddRows"></div>
+      </div>
+
+      <!-- 告警 -->
+      <div class="card">
+        <div class="card-head">
+          <h2>告警规则</h2>
+          <span class="sub">阈值可编辑 · 开关即时生效（mock）</span>
+        </div>
+        <div id="alertRows"></div>
+      </div>
+
+      <!-- 水下图 -->
+      <div class="card wide">
+        <div class="card-head">
+          <h2>回撤水下图</h2>
+          <span class="sub">距一年内滚动高点的即时回撤</span>
+        </div>
+        <div class="chart" id="uwChart"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>数据全部为 mock，仅用于交互验证。数据源规划：Dukascopy 分钟蜡烛 · FRED GVZCLS / DFII10 · 季度成本表（手工维护）。</footer>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+/* ============ 工具 ============ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};}
+const rnd = mulberry32(20260818);
+function randn(){let u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+const SVGNS="http://www.w3.org/2000/svg";
+function el(n,attrs,parent){const e=document.createElementNS(SVGNS,n);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function fmt(x,d=2){return x.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});}
+function pct(x,d=2){return (x>=0?"+":"")+ (x*100).toFixed(d)+"%";}
+function niceTicks(min,max,n){
+  const span=max-min, step0=span/Math.max(1,n), mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  let step=mag;for(const m of [1,2,2.5,5,10]){if(step0<=m*mag){step=m*mag;break;}}
+  const t=[];for(let v=Math.ceil(min/step)*step; v<=max+1e-9; v+=step)t.push(v);return t;
+}
+const tooltip=document.getElementById("tooltip");
+function showTip(html,x,y){
+  tooltip.innerHTML=html; tooltip.style.display="block";
+  const r=tooltip.getBoundingClientRect();
+  let left=x+14, top=y-r.height-10;
+  if(left+r.width>window.innerWidth-8) left=x-r.width-14;
+  if(top<8) top=y+16;
+  tooltip.style.left=left+"px"; tooltip.style.top=top+"px";
+}
+function hideTip(){tooltip.style.display="none";}
+
+/* ============ Mock 数据 ============ */
+function walk(n,start,vol,drift){
+  const c=[start];
+  for(let i=1;i<n;i++) c.push(c[i-1]*Math.exp(drift+vol*randn()));
+  return c;
+}
+function scaleTo(arr,end){const k=end/arr[arr.length-1];return arr.map(v=>v*k);}
+function toCandles(closes,wickVol){
+  const out=[];
+  for(let i=0;i<closes.length;i++){
+    const o=i===0?closes[0]*(1-wickVol*0.3):closes[i-1], c=closes[i];
+    const h=Math.max(o,c)*(1+Math.abs(randn())*wickVol);
+    const l=Math.min(o,c)*(1-Math.abs(randn())*wickVol);
+    out.push({o,h,l,c});
+  }
+  return out;
+}
+function tradingDaysBack(n,endStr){
+  const out=[],d=new Date(endStr+"T00:00:00Z");
+  while(out.length<n){
+    const wd=d.getUTCDay();
+    if(wd!==0&&wd!==6) out.unshift(new Date(d));
+    d.setUTCDate(d.getUTCDate()-1);
+  }
+  return out;
+}
+const TODAY="2026-08-18";
+const LAST=3412.55, PREV_CLOSE=3390.20, ATR=42.5;
+
+const D = {};
+// 日线 3 年
+D.dates3y = tradingDaysBack(756,TODAY);
+D.daily3y = scaleTo(walk(756,1950,0.011,0.00072),LAST);
+D.daily1y = D.daily3y.slice(-252);
+D.dates1y = D.dates3y.slice(-252);
+D.candles1d = toCandles(D.daily1y,0.004).map((k,i)=>({...k,t:D.dates1y[i]}));
+// 分钟（当日 390 根）
+{
+  const closes=scaleTo(walk(390,PREV_CLOSE,0.00055,0.000012),LAST);
+  const t0=Date.UTC(2026,7,18,0,0);
+  D.candles1m=toCandles(closes,0.0004).map((k,i)=>({...k,t:new Date(t0+i*60000)}));
+}
+// 5 分钟（五日 390 根）
+{
+  const closes=scaleTo(walk(390,3350,0.0012,0.00002),LAST);
+  const t0=Date.UTC(2026,7,12,0,0);
+  D.candles5m=toCandles(closes,0.0009).map((k,i)=>{
+    const day=Math.floor(i/78), slot=i%78;
+    return {...k,t:new Date(t0+day*86400000+slot*5*60000)};
+  });
+}
+// 波动率（日频 3 年）
+{
+  const gvz=[16],hv7=[13],hv20=[13.5],hv60=[14],tips=[1.55];
+  for(let i=1;i<756;i++){
+    gvz.push(Math.max(8,gvz[i-1]+0.10*(18-gvz[i-1])+randn()*0.85));
+    hv7.push(Math.max(6,hv7[i-1]+0.15*(13.5-hv7[i-1])+randn()*0.9));
+    hv20.push(Math.max(7,hv20[i-1]+0.06*(14.2-hv20[i-1])+randn()*0.42));
+    hv60.push(Math.max(8,hv60[i-1]+0.03*(14.5-hv60[i-1])+randn()*0.22));
+    tips.push(tips[i-1]+0.02*(1.9-tips[i-1])+randn()*0.035);
+  }
+  gvz[755]=18.4; hv20[755]=14.2;
+  D.gvz=gvz; D.hv={7:hv7,20:hv20,60:hv60}; D.tips=tips;
+}
+// 季度成本价
+D.costTable=[
+  ["2025 Q3",1408],["2025 Q4",1436],["2026 Q1",1468],["2026 Q2",1497],["2026 Q3",1520]
+];
+function costAt(date){
+  const q=Math.floor(date.getUTCMonth()/3)+1, key=date.getUTCFullYear()+" Q"+q;
+  for(let i=D.costTable.length-1;i>=0;i--) if(D.costTable[i][0]<=key) return D.costTable[i];
+  return D.costTable[0];
+}
+// 回撤分布样本（%，正数表示回撤深度）
+function ddSamples(scale,base,n){const a=[];for(let i=0;i<n;i++)a.push(base+(-Math.log(rnd()))*scale);return a;}
+D.dist=[
+  {g:"日", win:"当日",   samples:ddSamples(0.55,0.05,1500), cur:0.82},
+  {g:"周", win:"滚动5日", samples:ddSamples(1.05,0.30,1500), cur:1.62},
+  {g:"月", win:"滚动21日",samples:ddSamples(1.75,0.60,1500), cur:3.04}
+];
+function percentile(samples,v){let c=0;for(const s of samples)if(s<=v)c++;return Math.round(100*c/samples.length);}
+// MDD 各窗口
+D.mdd=[["当日",0.82],["近3日",1.62],["近7日",2.10],["近14日",3.04],["近28日",4.21]];
+D.mdd28=4.21;
+
+/* ============ 通用图表片段 ============ */
+const PAD={l:56,r:16,t:10,b:22};
+function frame(container,h){
+  container.innerHTML="";
+  const w=Math.max(320,container.clientWidth);
+  const svg=el("svg",{viewBox:`0 0 ${w} ${h}`,width:w,height:h});
+  container.appendChild(svg);
+  return {svg,w,h,x0:PAD.l,x1:w-PAD.r,y0:PAD.t,y1:h-PAD.b};
+}
+function yAxis(f,min,max,fmtFn){
+  const ticks=niceTicks(min,max,5);
+  const y=v=>f.y1-(v-min)/(max-min)*(f.y1-f.y0);
+  for(const t of ticks){
+    el("line",{x1:f.x0,x2:f.x1,y1:y(t),y2:y(t),stroke:"var(--grid)","stroke-width":1},f.svg);
+    const tx=el("text",{x:f.x0-8,y:y(t)+4,"text-anchor":"end","font-size":11,fill:"var(--muted)"},f.svg);
+    tx.textContent=fmtFn?fmtFn(t):fmt(t,0);
+    tx.style.fontVariantNumeric="tabular-nums";
+  }
+  return y;
+}
+function xLabels(f,labels,every){
+  const n=labels.length, step=(f.x1-f.x0)/Math.max(1,n-1);
+  for(let i=0;i<n;i+=every){
+    const tx=el("text",{x:f.x0+i*step,y:f.y1+16,"text-anchor":"middle","font-size":11,fill:"var(--muted)"},f.svg);
+    tx.textContent=labels[i];
+  }
+}
+function linePath(f,vals,min,max){
+  const y=v=>f.y1-(v-min)/(max-min)*(f.y1-f.y0);
+  const step=(f.x1-f.x0)/Math.max(1,vals.length-1);
+  return vals.map((v,i)=>(i?"L":"M")+(f.x0+i*step).toFixed(1)+","+y(v).toFixed(1)).join("");
+}
+
+/* ============ A+B：K线 + 溢价（联动光标） ============ */
+const priceState={g:"1m",cost:true};
+let candleView=null;
+function fmtTime(g,t){
+  const p=n=>String(n).padStart(2,"0");
+  if(g==="1m")return p(t.getUTCHours())+":"+p(t.getUTCMinutes());
+  if(g==="5m")return (t.getUTCMonth()+1)+"/"+t.getUTCDate()+" "+p(t.getUTCHours())+":"+p(t.getUTCMinutes());
+  return (t.getUTCFullYear()%100)+"/"+(t.getUTCMonth()+1);
+}
+function renderPriceCombo(){
+  const g=priceState.g;
+  const candles=g==="1m"?D.candles1m:g==="5m"?D.candles5m:D.candles1d;
+  const showCost=priceState.cost&&g==="1d";
+  document.getElementById("priceSub").textContent=
+    g==="1m"?"当日 · 1 分钟":g==="5m"?"近五日 · 5 分钟":"近一年 · 日线";
+  document.getElementById("costChk").disabled=(g!=="1d");
+  document.getElementById("costChkWrap").style.opacity=(g!=="1d")?.45:1;
+
+  // --- 上：K线 ---
+  const fc=frame(document.getElementById("candleChart"),300);
+  let lo=Math.min(...candles.map(k=>k.l)), hi=Math.max(...candles.map(k=>k.h));
+  if(showCost) lo=Math.min(lo,D.costTable[0][1]*0.98);
+  const pad=(hi-lo)*0.05; lo-=pad; hi+=pad;
+  const yc=yAxis(fc,lo,hi,v=>fmt(v,0));
+  const n=candles.length, step=(fc.x1-fc.x0)/n, bw=Math.min(24,Math.max(1.5,step*0.65));
+  const up=css("--up"),down=css("--down");
+  for(let i=0;i<n;i++){
+    const k=candles[i], x=fc.x0+i*step+step/2, col=k.c>=k.o?up:down;
+    el("line",{x1:x,x2:x,y1:yc(k.h),y2:yc(k.l),stroke:col,"stroke-width":1},fc.svg);
+    const y=yc(Math.max(k.o,k.c)), hgt=Math.max(1,Math.abs(yc(k.o)-yc(k.c)));
+    el("rect",{x:x-bw/2,y:y,width:bw,height:hgt,fill:col,rx:Math.min(1.5,bw/4)},fc.svg);
+  }
+  xLabels(fc,candles.map(k=>fmtTime(g,k.t)),Math.ceil(n/8));
+  // 成本阶梯线
+  if(showCost){
+    let d="",prevX=fc.x0;
+    for(let i=0;i<n;i++){
+      const c=costAt(candles[i].t)[1], x=fc.x0+i*step+step/2;
+      const yv=yc(c);
+      d+=(i===0?`M${x.toFixed(1)},${yv.toFixed(1)}`:`L${x.toFixed(1)},${yv.toFixed(1)}`);
+    }
+    el("path",{d,fill:"none",stroke:"var(--accent)","stroke-width":2,"stroke-dasharray":"5 4"},fc.svg);
+    const t=el("text",{x:fc.x1-4,y:yc(D.costTable.at(-1)[1])-6,"text-anchor":"end","font-size":11,fill:"var(--accent)","font-weight":600},fc.svg);
+    t.textContent="成本价 "+fmt(D.costTable.at(-1)[1],0);
+  }
+  // 最新价标签
+  {
+    const lastC=candles[n-1].c;
+    const t=el("text",{x:fc.x1-4,y:yc(lastC)-6,"text-anchor":"end","font-size":11,fill:"var(--ink)","font-weight":600},fc.svg);
+    t.textContent=fmt(lastC,1);
+    t.style.fontVariantNumeric="tabular-nums";
+  }
+
+  // --- 下：溢价率 ---
+  const fp=frame(document.getElementById("premChart"),150);
+  const prem=candles.map(k=>k.c/costAt(k.t)[1]-1);
+  const pmin=Math.min(...prem), pmax=Math.max(...prem), ppad=(pmax-pmin)*0.15||0.01;
+  const yp=yAxis(fp,pmin-ppad,pmax+ppad,v=>(v*100).toFixed(g==="1d"?0:2)+"%");
+  el("path",{d:linePath(fp,prem,pmin-ppad,pmax+ppad),fill:"none",stroke:"var(--accent)","stroke-width":2,"stroke-linejoin":"round"},fp.svg);
+  // 换季竖标
+  if(g==="1d"){
+    let prevQ=costAt(candles[0].t)[0];
+    for(let i=1;i<n;i++){
+      const q=costAt(candles[i].t)[0];
+      if(q!==prevQ){
+        const x=fp.x0+i*((fp.x1-fp.x0)/n)+((fp.x1-fp.x0)/n)/2;
+        el("line",{x1:x,x2:x,y1:fp.y0,y2:fp.y1,stroke:"var(--axis)","stroke-width":1,"stroke-dasharray":"2 3"},fp.svg);
+        const t=el("text",{x:x+4,y:fp.y0+10,"font-size":10,fill:"var(--muted)"},fp.svg);
+        t.textContent=q;
+        prevQ=q;
+      }
+    }
+  }
+  document.getElementById("premNow").textContent="当前溢价 "+pct(prem[n-1],1)+"（成本 "+fmt(costAt(candles[n-1].t)[1],0)+"）";
+
+  // --- 联动十字光标 ---
+  const crossC=el("g",{},fc.svg), crossP=el("g",{},fp.svg);
+  function drawCross(i,clientX,clientY){
+    crossC.innerHTML=""; crossP.innerHTML="";
+    const x=fc.x0+i*step+step/2;
+    el("line",{x1:x,x2:x,y1:fc.y0,y2:fc.y1,stroke:"var(--axis)","stroke-width":1},crossC);
+    el("line",{x1:x,x2:x,y1:fp.y0,y2:fp.y1,stroke:"var(--axis)","stroke-width":1},crossP);
+    el("circle",{cx:x,cy:yp(prem[i]),r:4,fill:"var(--accent)",stroke:"var(--surface)","stroke-width":2},crossP);
+    const k=candles[i], chg=k.c/k.o-1;
+    showTip(
+      `<div class="t-head">${fmtTime(g,k.t)}</div>`+
+      `<div class="row"><span class="k">开</span><span class="num">${fmt(k.o,1)}</span></div>`+
+      `<div class="row"><span class="k">高</span><span class="num">${fmt(k.h,1)}</span></div>`+
+      `<div class="row"><span class="k">低</span><span class="num">${fmt(k.l,1)}</span></div>`+
+      `<div class="row"><span class="k">收</span><span class="num">${fmt(k.c,1)} (${pct(chg)})</span></div>`+
+      `<div class="row"><span class="k">成本溢价</span><span class="num">${pct(prem[i],1)}</span></div>`,
+      clientX,clientY);
+  }
+  function onMove(ev){
+    const rect=ev.currentTarget.getBoundingClientRect();
+    const px=(ev.clientX-rect.left)*(fc.w/rect.width);
+    let i=Math.floor((px-fc.x0)/step);
+    i=Math.max(0,Math.min(n-1,i));
+    drawCross(i,ev.clientX,ev.clientY);
+  }
+  function onLeave(){crossC.innerHTML="";crossP.innerHTML="";hideTip();}
+  for(const s of [fc.svg,fp.svg]){
+    s.style.cursor="crosshair";
+    s.addEventListener("mousemove",onMove);
+    s.addEventListener("mouseleave",onLeave);
+  }
+  candleView={candles,g};
+}
+document.getElementById("granSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.querySelectorAll("#granSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  priceState.g=b.dataset.g;
+  renderPriceCombo();
+});
+document.getElementById("costChk").addEventListener("change",e=>{
+  priceState.cost=e.target.checked; renderPriceCombo();
+});
+
+/* ============ C：回撤分布 ============ */
+function renderDist(){
+  const wrap=document.getElementById("distRows"); wrap.innerHTML="";
+  for(const d of D.dist){
+    const p=percentile(d.samples,d.cur);
+    const row=document.createElement("div"); row.className="dist-row";
+    row.innerHTML=`<div class="g-lbl">${d.g}<small>${d.win}</small></div>
+      <div class="chart hist"></div>
+      <div class="cur num">当前 <b>−${d.cur.toFixed(2)}%</b><br><span class="p">P${p}</span> · 深于历史 ${p}%</div>`;
+    wrap.appendChild(row);
+    // 直方图
+    const host=row.querySelector(".hist");
+    const w=Math.max(200,host.clientWidth||300), h=56;
+    const svg=el("svg",{viewBox:`0 0 ${w} ${h}`,width:"100%",height:h});
+    host.appendChild(svg);
+    const maxV=Math.max(...d.samples)*0.98, bins=28, cnt=new Array(bins).fill(0);
+    for(const s of d.samples){const b=Math.min(bins-1,Math.floor(s/maxV*bins));cnt[b]++;}
+    const cmax=Math.max(...cnt), bwv=w/bins;
+    for(let b=0;b<bins;b++){
+      const bh=Math.max(1,cnt[b]/cmax*(h-16));
+      const r=el("rect",{x:b*bwv+1,y:h-10-bh,width:bwv-2,height:bh,rx:1.5,fill:"var(--accent)",opacity:.55},svg);
+      const lo=(b*maxV/bins).toFixed(1), hi2=((b+1)*maxV/bins).toFixed(1);
+      const share=(100*cnt[b]/d.samples.length).toFixed(1);
+      r.addEventListener("mousemove",ev=>showTip(
+        `<div class="t-head">${d.g}回撤 ${lo}%–${hi2}%</div><div class="row"><span class="k">历史占比</span><span>${share}%</span></div>`,
+        ev.clientX,ev.clientY));
+      r.addEventListener("mouseleave",hideTip);
+    }
+    // 当前值标记
+    const cx=Math.min(w-4,d.cur/maxV*w);
+    el("line",{x1:cx,x2:cx,y1:2,y2:h-10,stroke:"var(--ink)","stroke-width":1.5},svg);
+    el("path",{d:`M${cx-5},2 L${cx+5},2 L${cx},9 Z`,fill:"var(--ink)"},svg);
+    el("line",{x1:0,x2:w,y1:h-10,y2:h-10,stroke:"var(--axis)","stroke-width":1},svg);
+    const t0=el("text",{x:0,y:h,"font-size":9,fill:"var(--muted)"},svg); t0.textContent="0%";
+    const t1=el("text",{x:w,y:h,"text-anchor":"end","font-size":9,fill:"var(--muted)"},svg); t1.textContent="−"+maxV.toFixed(0)+"%";
+  }
+}
+
+/* ============ D：波动率 ============ */
+const volState={hv:20,win:252};
+function renderVol(){
+  const f=frame(document.getElementById("volChart"),220);
+  const g=D.gvz.slice(-volState.win), hv=D.hv[volState.hv].slice(-volState.win);
+  const min=Math.min(...g,...hv)-1, max=Math.max(...g,...hv)+1;
+  const y=yAxis(f,min,max,v=>fmt(v,0));
+  const n=g.length, step=(f.x1-f.x0)/Math.max(1,n-1);
+  // 隐含>实现 阴影
+  for(let i=0;i<n;i++){
+    if(g[i]>hv[i]){
+      el("rect",{x:f.x0+i*step-step/2,y:y(g[i]),width:step+0.5,height:y(hv[i])-y(g[i]),fill:"var(--blue)",opacity:.10},f.svg);
+    }
+  }
+  el("path",{d:linePath(f,hv,min,max),fill:"none",stroke:"var(--aqua)","stroke-width":2,"stroke-linejoin":"round"},f.svg);
+  el("path",{d:linePath(f,g,min,max),fill:"none",stroke:"var(--blue)","stroke-width":2,"stroke-linejoin":"round"},f.svg);
+  const dates=D.dates3y.slice(-volState.win);
+  xLabels(f,dates.map(d=>(d.getUTCFullYear()%100)+"/"+(d.getUTCMonth()+1)),Math.ceil(n/6));
+  document.getElementById("hvLegend").innerHTML=
+    `<span class="sw" style="background:var(--aqua)"></span>HV${volState.hv} 实现`;
+  // hover
+  const cross=el("g",{},f.svg);
+  f.svg.style.cursor="crosshair";
+  f.svg.addEventListener("mousemove",ev=>{
+    const rect=f.svg.getBoundingClientRect();
+    const px=(ev.clientX-rect.left)*(f.w/rect.width);
+    let i=Math.round((px-f.x0)/step); i=Math.max(0,Math.min(n-1,i));
+    cross.innerHTML="";
+    const x=f.x0+i*step;
+    el("line",{x1:x,x2:x,y1:f.y0,y2:f.y1,stroke:"var(--axis)"},cross);
+    el("circle",{cx:x,cy:y(g[i]),r:4,fill:"var(--blue)",stroke:"var(--surface)","stroke-width":2},cross);
+    el("circle",{cx:x,cy:y(hv[i]),r:4,fill:"var(--aqua)",stroke:"var(--surface)","stroke-width":2},cross);
+    const d=dates[i];
+    showTip(`<div class="t-head">${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}</div>`+
+      `<div class="row"><span class="k">GVZ 隐含</span><span class="num">${g[i].toFixed(1)}</span></div>`+
+      `<div class="row"><span class="k">HV${volState.hv} 实现</span><span class="num">${hv[i].toFixed(1)}%</span></div>`+
+      `<div class="row"><span class="k">溢价</span><span class="num">${(g[i]-hv[i]).toFixed(1)}pt</span></div>`,
+      ev.clientX,ev.clientY);
+  });
+  f.svg.addEventListener("mouseleave",()=>{cross.innerHTML="";hideTip();});
+}
+document.getElementById("hvSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.querySelectorAll("#hvSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  volState.hv=+b.dataset.hv; renderVol();
+});
+document.getElementById("volWinSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.querySelectorAll("#volWinSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  volState.win=+b.dataset.w; renderVol();
+});
+
+/* ============ E：宏观（上下两幅共享时间轴，一图一轴） ============ */
+function renderMacro(){
+  const host=document.getElementById("macroChart");
+  host.innerHTML="";
+  const w=Math.max(320,host.clientWidth), h1=140, h2=140, gap=26, H=h1+h2+gap+24;
+  const svg=el("svg",{viewBox:`0 0 ${w} ${H}`,width:w,height:H});
+  host.appendChild(svg);
+  const tips=D.tips.slice(-252), px=D.daily1y, dates=D.dates1y;
+  const n=252, x0=PAD.l, x1=w-PAD.r, step=(x1-x0)/(n-1);
+  function panel(top,h,vals,color,fmtFn,label){
+    const yTop=top, yBot=top+h;
+    const min=Math.min(...vals), max=Math.max(...vals), pad=(max-min)*0.08;
+    const lo=min-pad, hi=max+pad;
+    const y=v=>yBot-(v-lo)/(hi-lo)*(yBot-yTop);
+    for(const t of niceTicks(lo,hi,3)){
+      el("line",{x1:x0,x2:x1,y1:y(t),y2:y(t),stroke:"var(--grid)"},svg);
+      const tx=el("text",{x:x0-8,y:y(t)+4,"text-anchor":"end","font-size":11,fill:"var(--muted)"},svg);
+      tx.textContent=fmtFn(t); tx.style.fontVariantNumeric="tabular-nums";
+    }
+    const d=vals.map((v,i)=>(i?"L":"M")+(x0+i*step).toFixed(1)+","+y(v).toFixed(1)).join("");
+    el("path",{d,fill:"none",stroke:color,"stroke-width":2,"stroke-linejoin":"round"},svg);
+    const lt=el("text",{x:x0,y:yTop+2,"font-size":11,fill:"var(--ink-2)","font-weight":600},svg);
+    lt.textContent=label;
+    return y;
+  }
+  const yT=panel(14,h1,tips,"var(--violet)",v=>v.toFixed(1)+"%","TIPS 10Y 实际利率");
+  const yP=panel(14+h1+gap,h2,px,"var(--accent)",v=>fmt(v,0),"XAU/USD 收盘");
+  for(let i=0;i<n;i+=Math.ceil(n/8)){
+    const t=el("text",{x:x0+i*step,y:H-4,"text-anchor":"middle","font-size":11,fill:"var(--muted)"},svg);
+    t.textContent=(dates[i].getUTCFullYear()%100)+"/"+(dates[i].getUTCMonth()+1);
+  }
+  const cross=el("g",{},svg);
+  svg.style.cursor="crosshair";
+  svg.addEventListener("mousemove",ev=>{
+    const rect=svg.getBoundingClientRect();
+    const pxx=(ev.clientX-rect.left)*(w/rect.width);
+    let i=Math.round((pxx-x0)/step); i=Math.max(0,Math.min(n-1,i));
+    cross.innerHTML="";
+    const x=x0+i*step;
+    el("line",{x1:x,x2:x,y1:14,y2:H-24,stroke:"var(--axis)"},cross);
+    el("circle",{cx:x,cy:yT(tips[i]),r:4,fill:"var(--violet)",stroke:"var(--surface)","stroke-width":2},cross);
+    el("circle",{cx:x,cy:yP(px[i]),r:4,fill:"var(--accent)",stroke:"var(--surface)","stroke-width":2},cross);
+    const d=dates[i];
+    showTip(`<div class="t-head">${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}</div>`+
+      `<div class="row"><span class="k">实际利率</span><span class="num">${tips[i].toFixed(2)}%</span></div>`+
+      `<div class="row"><span class="k">金价</span><span class="num">${fmt(px[i],1)}</span></div>`,
+      ev.clientX,ev.clientY);
+  });
+  svg.addEventListener("mouseleave",()=>{cross.innerHTML="";hideTip();});
+}
+
+/* ============ 风控：止损模拟 ============ */
+const riskState={k:1.5,dir:"long",cost:3350};
+let livePrice=LAST;
+function renderStops(){
+  const k=riskState.k, p=livePrice;
+  const sl=p-k*ATR, ss=p+k*ATR;
+  document.getElementById("atrKLbl").textContent=k.toFixed(1)+"×";
+  document.getElementById("stopLong").textContent=fmt(sl,1);
+  document.getElementById("stopShort").textContent=fmt(ss,1);
+  document.getElementById("stopDist").textContent=fmt(k*ATR,1)+" ("+(k*ATR/p*100).toFixed(2)+"%)";
+  const cost=riskState.cost, long=riskState.dir==="long";
+  const pnl=long?(p/cost-1):(cost/p-1)*(p/cost); // 简化
+  const pnlSimple=long?(p-cost)/cost:(cost-p)/cost;
+  const stop=long?sl:ss;
+  const toStop=Math.abs(p-stop)/p;
+  const pnlEl=document.getElementById("pnl");
+  pnlEl.textContent=pct(pnlSimple);
+  pnlEl.style.color=pnlSimple>=0?"var(--up)":"var(--down)";
+  document.getElementById("toStop").textContent=pct(-toStop,2).replace("+","−");
+  const curDD=D.dist[2].cur;
+  document.getElementById("ddJudge").innerHTML= curDD<D.mdd28
+    ? `<span class="pill ok">回撤 −${curDD}% 未超近28日 MDD −${D.mdd28}% · 正常波动</span>`
+    : `<span class="pill bad">回撤已超近28日 MDD · 异常</span>`;
+  // 小图
+  const f=frame(document.getElementById("stopChart"),190);
+  const closes=D.daily1y.slice(-60);
+  const min=Math.min(...closes,sl)-15, max=Math.max(...closes,ss)+15;
+  const y=yAxis(f,min,max,v=>fmt(v,0));
+  el("path",{d:linePath(f,closes,min,max),fill:"none",stroke:"var(--accent)","stroke-width":2,"stroke-linejoin":"round"},f.svg);
+  for(const [v,lbl] of [[sl,"多头止损 "+fmt(sl,0)],[ss,"空头止损 "+fmt(ss,0)]]){
+    el("line",{x1:f.x0,x2:f.x1,y1:y(v),y2:y(v),stroke:"var(--crit)","stroke-width":1.5,"stroke-dasharray":"5 4"},f.svg);
+    const t=el("text",{x:f.x1-4,y:y(v)-5,"text-anchor":"end","font-size":11,fill:"var(--crit)"},f.svg);
+    t.textContent=lbl;
+  }
+  const lastX=f.x1, lastY=y(closes[closes.length-1]);
+  el("circle",{cx:lastX,cy:lastY,r:4,fill:"var(--accent)",stroke:"var(--surface)","stroke-width":2},f.svg);
+}
+document.getElementById("atrK").addEventListener("input",e=>{riskState.k=+e.target.value;renderStops();});
+document.getElementById("costIn").addEventListener("input",e=>{riskState.cost=+e.target.value||0;renderStops();});
+document.getElementById("dirSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.querySelectorAll("#dirSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  riskState.dir=b.dataset.d; renderStops();
+});
+
+/* ============ 风控：MDD 条 ============ */
+function renderMdd(){
+  const wrap=document.getElementById("mddRows"); wrap.innerHTML="";
+  const maxV=Math.max(...D.mdd.map(m=>m[1]));
+  for(const [lbl,v] of D.mdd){
+    const row=document.createElement("div"); row.className="mdd-row";
+    row.innerHTML=`<div class="lbl">${lbl}</div>
+      <div><div class="bar" style="width:${(v/maxV*100).toFixed(1)}%"></div></div>
+      <div class="v num">−${v.toFixed(2)}%</div>`;
+    row.querySelector(".bar").addEventListener("mousemove",ev=>showTip(
+      `<div class="t-head">${lbl}最大回撤</div><div class="row"><span class="k">高点→低点</span><span>8/12 → 8/15（mock）</span></div>`,
+      ev.clientX,ev.clientY));
+    row.querySelector(".bar").addEventListener("mouseleave",hideTip);
+    wrap.appendChild(row);
+  }
+}
+
+/* ============ 风控：告警 ============ */
+const ALERTS=[
+  {name:"价格跌破 ATR 止损线", hit:true,  time:"10:32 UTC", th:"1.5", unit:"× ATR"},
+  {name:"GVZ 突破一年高分位",   hit:true,  time:"昨日",       th:"80",  unit:"分位"},
+  {name:"当日回撤超近7日 MDD",  hit:false, time:"—",          th:"100", unit:"%"},
+  {name:"实际利率单日变动",      hit:false, time:"—",          th:"0.10",unit:"pt"}
+];
+function renderAlerts(){
+  const wrap=document.getElementById("alertRows"); wrap.innerHTML="";
+  ALERTS.forEach((a,i)=>{
+    const row=document.createElement("div"); row.className="alert-row";
+    row.innerHTML=`<span class="dot ${a.hit?"hit":"idle"}"></span>
+      <div class="a-main">
+        <div class="a-name">${a.name}
+          <span class="st ${a.hit?"hit":"idle"}">${a.hit?"已触发 · "+a.time:"未触发"}</span>
+        </div>
+        <div class="a-sub">阈值 <input type="text" value="${a.th}" aria-label="阈值"> ${a.unit}</div>
+      </div>
+      <label class="switch"><input type="checkbox" ${a.hit||i<3?"checked":""} aria-label="启用规则"><i></i></label>`;
+    wrap.appendChild(row);
+  });
+}
+
+/* ============ 风控：水下图 ============ */
+function renderUnderwater(){
+  const f=frame(document.getElementById("uwChart"),200);
+  const closes=D.daily1y;
+  let peak=closes[0];
+  const dd=closes.map(c=>{peak=Math.max(peak,c);return c/peak-1;});
+  const min=Math.min(...dd)*1.15, max=0.004;
+  const y=yAxis(f,min,max,v=>(v*100).toFixed(0)+"%");
+  const n=dd.length, step=(f.x1-f.x0)/(n-1);
+  let d="M"+f.x0+","+y(0);
+  dd.forEach((v,i)=>{d+="L"+(f.x0+i*step).toFixed(1)+","+y(v).toFixed(1);});
+  d+="L"+f.x1+","+y(0)+"Z";
+  el("path",{d,fill:"var(--crit)",opacity:.12},f.svg);
+  el("path",{d:linePath(f,dd,min,max),fill:"none",stroke:"var(--crit)","stroke-width":2,"stroke-linejoin":"round"},f.svg);
+  el("line",{x1:f.x0,x2:f.x1,y1:y(0),y2:y(0),stroke:"var(--axis)"},f.svg);
+  const iMin=dd.indexOf(Math.min(...dd));
+  const mx=f.x0+iMin*step;
+  el("circle",{cx:mx,cy:y(dd[iMin]),r:4,fill:"var(--crit)",stroke:"var(--surface)","stroke-width":2},f.svg);
+  const t=el("text",{x:mx,y:y(dd[iMin])+16,"text-anchor":"middle","font-size":11,fill:"var(--ink-2)","font-weight":600},f.svg);
+  t.textContent="最深 "+(dd[iMin]*100).toFixed(1)+"%";
+  xLabels(f,D.dates1y.map(dt=>(dt.getUTCFullYear()%100)+"/"+(dt.getUTCMonth()+1)),Math.ceil(n/8));
+  f.svg.style.cursor="crosshair";
+  const cross=el("g",{},f.svg);
+  f.svg.addEventListener("mousemove",ev=>{
+    const rect=f.svg.getBoundingClientRect();
+    const px=(ev.clientX-rect.left)*(f.w/rect.width);
+    let i=Math.round((px-f.x0)/step); i=Math.max(0,Math.min(n-1,i));
+    cross.innerHTML="";
+    const x=f.x0+i*step;
+    el("line",{x1:x,x2:x,y1:f.y0,y2:f.y1,stroke:"var(--axis)"},cross);
+    el("circle",{cx:x,cy:y(dd[i]),r:4,fill:"var(--crit)",stroke:"var(--surface)","stroke-width":2},cross);
+    const dt=D.dates1y[i];
+    showTip(`<div class="t-head">${dt.getUTCFullYear()}/${dt.getUTCMonth()+1}/${dt.getUTCDate()}</div>`+
+      `<div class="row"><span class="k">距滚动高点</span><span class="num">${(dd[i]*100).toFixed(2)}%</span></div>`,
+      ev.clientX,ev.clientY);
+  });
+  f.svg.addEventListener("mouseleave",()=>{cross.innerHTML="";hideTip();});
+}
+
+/* ============ KPI 实时 tick ============ */
+function updateKpis(flash){
+  const p=livePrice, chg=p/PREV_CLOSE-1;
+  const elP=document.getElementById("kPrice");
+  const prev=parseFloat(elP.dataset.v||p);
+  elP.textContent=fmt(p,2); elP.dataset.v=p;
+  elP.classList.remove("f-up","f-down");
+  if(flash){void elP.offsetWidth; elP.classList.add(p>=prev?"f-up":"f-down");}
+  const dEl=document.getElementById("kDelta");
+  dEl.textContent=pct(chg)+" 较昨收";
+  dEl.className="delta num "+(chg>=0?"up":"down");
+  const hi=Math.max(...D.candles1m.map(k=>k.h)), lo=Math.min(...D.candles1m.map(k=>k.l));
+  document.getElementById("kRange").textContent=fmt(lo,0)+" – "+fmt(hi,0);
+  document.getElementById("kOpen").textContent="开 "+fmt(D.candles1m[0].o,1)+" · 昨收 "+fmt(PREV_CLOSE,1);
+  document.getElementById("kAtr").textContent=fmt(ATR,1);
+  document.getElementById("kAtrPct").textContent="占现价 "+(ATR/p*100).toFixed(2)+"%";
+}
+setInterval(()=>{
+  livePrice=Math.max(3000,livePrice+randn()*1.4);
+  const lastK=D.candles1m[D.candles1m.length-1];
+  lastK.c=livePrice; lastK.h=Math.max(lastK.h,livePrice); lastK.l=Math.min(lastK.l,livePrice);
+  updateKpis(true);
+  if(document.getElementById("board-risk").classList.contains("on")) renderStops();
+},2500);
+
+/* ============ Tab / 主题 / resize ============ */
+document.getElementById("tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b));
+  const id=b.dataset.board;
+  document.getElementById("board-main").classList.toggle("on",id==="main");
+  document.getElementById("board-risk").classList.toggle("on",id==="risk");
+  if(id==="main"){renderPriceCombo();renderDist();renderVol();renderMacro();}
+  else{renderStops();renderMdd();renderAlerts();renderUnderwater();}
+});
+document.getElementById("themeBtn").addEventListener("click",()=>{
+  const r=document.documentElement;
+  const cur=r.getAttribute("data-theme");
+  const sysDark=matchMedia("(prefers-color-scheme: dark)").matches;
+  const isDark=cur? cur==="dark" : sysDark;
+  r.setAttribute("data-theme", isDark?"light":"dark");
+  rerenderVisible();
+});
+let rzT=null;
+window.addEventListener("resize",()=>{clearTimeout(rzT);rzT=setTimeout(rerenderVisible,150);});
+function rerenderVisible(){
+  if(document.getElementById("board-main").classList.contains("on")){
+    renderPriceCombo();renderDist();renderVol();renderMacro();
+  }else{
+    renderStops();renderMdd();renderAlerts();renderUnderwater();
+  }
+}
+
+/* ============ 启动 ============ */
+updateKpis(false);
+renderPriceCombo();
+renderDist();
+renderVol();
+renderMacro();
+renderStops();
+renderMdd();
+renderAlerts();
+renderUnderwater();
+</script>
