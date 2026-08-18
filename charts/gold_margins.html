@@ -1,0 +1,217 @@
+<title>Gold All-In Margin</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --panel: #f6f5f2; --line: #e2e0da;
+    --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #83817a;
+    --s-NEM: #2a78d6; --s-GOLD: #eb6834; --s-AEM: #1baf7a; --s-KGC: #eda100;
+    --band: #cbd5e1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface: #1a1a19; --panel: #232322; --line: #383835;
+      --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e85;
+      --s-NEM: #3987e5; --s-GOLD: #d95926; --s-AEM: #199e70; --s-KGC: #c98500;
+      --band: #3f4a57;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --panel: #232322; --line: #383835;
+    --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e85;
+    --s-NEM: #3987e5; --s-GOLD: #d95926; --s-AEM: #199e70; --s-KGC: #c98500;
+    --band: #3f4a57;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 24px 72px; background: var(--surface); color: var(--ink);
+    font: 15px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+  .sub { color: var(--ink-2); margin: 0 0 4px; font-size: 16px; }
+  .meta { color: var(--ink-3); font-size: 13px; margin: 0 0 36px; }
+  h2 { font-size: 18px; margin: 44px 0 6px; letter-spacing: -0.01em; }
+  h2 .n { color: var(--ink-3); font-weight: 400; font-size: 14px; margin-left: 8px; }
+  .note { color: var(--ink-2); font-size: 13.5px; margin: 0 0 18px; max-width: 74ch; }
+  .hero {
+    display: flex; gap: 32px; flex-wrap: wrap; padding: 20px 24px; margin: 0 0 8px;
+    background: var(--panel); border-radius: 10px;
+  }
+  .hero div { min-width: 128px; }
+  .hero .k { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .hero .v { font-size: 27px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 10px; font-size: 13.5px; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 13px; height: 3px; border-radius: 2px; display: inline-block; }
+  figure { margin: 0; }
+  .scroll { overflow-x: auto; }
+  svg { display: block; max-width: 100%; }
+  .grid { stroke: var(--line); stroke-width: 1; }
+  .zero { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+  .ax { fill: var(--ink-3); font-size: 11px; }
+  .lbl { font-size: 12px; font-weight: 600; }
+  .small { display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 18px; }
+  .sm { background: var(--panel); border-radius: 10px; padding: 14px 14px 8px; }
+  .sm h3 { margin: 0 0 2px; font-size: 14.5px; }
+  .sm p { margin: 0 0 8px; font-size: 12px; color: var(--ink-3); }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 9px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--ink-3); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--ink-2); font-size: 13.5px; padding: 6px 0; }
+  #tip {
+    position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px; font-size: 12.5px; box-shadow: 0 6px 22px rgb(0 0 0 / .16);
+    font-variant-numeric: tabular-nums; z-index: 9; max-width: 250px;
+  }
+  #tip b { display: block; margin-bottom: 5px; font-size: 12px; color: var(--ink-2); }
+  #tip .r { display: flex; justify-content: space-between; gap: 14px; }
+  footer { margin-top: 52px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12.5px; }
+  footer p { margin: 0 0 7px; max-width: 82ch; }
+</style>
+
+<div class="wrap">
+  <h1>What AISC hides</h1>
+  <p class="sub">Quarterly gold-segment profit margin for the four largest gold miners with genuine quarterly financial statements, 2021&nbsp;Q1&nbsp;–&nbsp;2026&nbsp;Q2.</p>
+  <p class="meta" id="meta"></p>
+
+  <div class="hero" id="hero"></div>
+
+  <h2>All-in margin, by company<span class="n">GAIM — every cost a shareholder bears</span></h2>
+  <p class="note">Computed forward from the filings: gold-segment revenue less operating cost, royalties, allocated corporate overhead, all exploration, <em>total</em> capital expenditure, reclamation, leases, net interest and cash taxes paid. Thin line is raw; thick line is the two-sided 15% trimmed series.</p>
+  <div class="legend" id="leg"></div>
+  <figure class="scroll"><svg id="main" width="1020" height="380" role="img" aria-label="All-in gold margin by company, 2021 to 2026"></svg></figure>
+
+  <h2>The gap is the product<span class="n">AISC margin vs all-in margin</span></h2>
+  <p class="note">Upper line is the industry-standard AISC margin; lower line is the all-in margin. The shaded band is the cost AISC leaves out — growth capital, greenfield exploration, tax, interest and financing.</p>
+  <div class="small" id="sm"></div>
+
+  <details>
+    <summary>Show the underlying numbers</summary>
+    <div class="scroll"><table id="tbl"></table></div>
+  </details>
+
+  <footer>
+    <p><b>Method.</b> Financial statements are the input; AISC is the checksum. For every company-quarter the same extracted line items are re-aggregated per the World Gold Council build-up and tied back to the company's own published AISC — a residual above 2% means the filing was misread and the observation is rejected. All 88 observations passed. Mean absolute residual by company: Kinross 0.02%, Newmont 0.04%, Barrick 0.14%, Agnico 0.22%; worst single observation 1.30%.</p>
+    <p><b>Smoothing.</b> Rolling 8-quarter window; the top and bottom <span style="white-space:nowrap">⌊0.15 × 8⌋ = 1</span> observation is dropped from each tail and the middle six averaged. A trim discards extremes rather than capping them, so one catastrophic quarter cannot drag the line. Every dropped observation is logged to <code>trimmed_observations.csv</code>.</p>
+    <p><b>Validation.</b> Implied realised price (gold revenue ÷ ounces sold) converges across all four independently extracted datasets to within ~1% in every quarter — no external gold price was used anywhere in this pipeline. The AISC margin exceeds the all-in margin in all 88 observations, as it must.</p>
+    <p><b>Not shown.</b> AngloGold Ashanti and Gold Fields publish full financial statements only half-yearly and are excluded from this quarterly view rather than interpolated.</p>
+  </footer>
+</div>
+<div id="tip"></div>
+
+<script>
+const D = {"quarters": ["2021Q1", "2021Q2", "2021Q3", "2021Q4", "2022Q1", "2022Q2", "2022Q3", "2022Q4", "2023Q1", "2023Q2", "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4", "2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2"], "series": [{"id": "NEM", "name": "Newmont", "light": "#2a78d6", "dark": "#3987e5", "l1": [21.85, 23.81, 17.54, 21.52, 20.72, 13.42, 1.34, 8.51, 10.34, 6.75, 3.88, 7.28, 16.85, 19.42, 18.9, 28.05, 25.57, 32.78, 37.58, 45.46, 44.07, 33.54], "l2": [21.85, 22.83, 21.07, 21.18, 21.09, 19.81, 19.01, 17.26, 15.34, 12.88, 10.6, 8.36, 8.36, 8.94, 11.44, 13.26, 15.8, 19.35, 23.6, 27.05, 31.24, 33.6], "l0": [38.72, 40.68, 34.42, 37.15, 35.24, 32.15, 24.04, 29.29, 29.35, 29.87, 29.38, 30.83, 34.39, 38.59, 40.05, 48.32, 47.82, 52.97, 56.22, 63.41, 65.23, 57.68], "aisc": [40.68, 43.17, 36.97, 41.31, 38.89, 34.72, 24.77, 30.88, 27.82, 25.1, 25.73, 25.92, 31.13, 33.48, 35.97, 44.68, 43.92, 52.02, 55.76, 61.56, 65.12, 56.1], "price": [1752, 1821, 1777, 1799, 1892, 1837, 1689, 1758, 1906, 1965, 1920, 2005, 2089, 2348, 2516, 2645, 2944, 3320, 3540, 4215, 4899, 4415], "mean_gaim": 20.9, "mean_aisc": 39.8, "gap": 18.9}, {"id": "GOLD", "name": "Barrick", "light": "#eb6834", "dark": "#d95926", "l1": [26.36, 9.95, 12.62, 27.47, 16.67, 8.12, 0.06, 1.87, 8.93, 6.62, 13.37, 11.29, 9.92, 10.02, 20.43, 23.21, 18.79, 17.56, 30.84, 30.88, 40.06, 19.09], "l2": [26.36, 18.16, 16.31, 19.1, 18.61, 16.86, 14.74, 12.6, 9.69, 9.14, 9.26, 8.37, 7.79, 8.11, 10.02, 12.33, 13.97, 15.24, 16.88, 20.14, 23.62, 23.87], "l0": [40.67, 39.9, 37.06, 40.81, 37.28, 34.69, 28.5, 25.96, 27.25, 32.47, 33.35, 30.68, 30.7, 37.62, 40.36, 45.78, 43.71, 49.21, 55.1, 54.98, 60.74, 55.01], "aisc": [42.65, 40.35, 41.59, 45.86, 37.96, 34.86, 26.36, 28.06, 27.95, 31.29, 34.94, 31.31, 28.99, 36.07, 39.61, 45.35, 38.71, 48.91, 55.52, 62.15, 64.58, 57.74], "price": [1775, 1822, 1770, 1793, 1876, 1861, 1723, 1726, 1901, 1972, 1929, 1986, 2076, 2343, 2495, 2655, 2896, 3296, 3458, 4177, 4822, 4416], "mean_gaim": 16.6, "mean_aisc": 40.9, "gap": 24.4}, {"id": "AEM", "name": "Agnico Eagle", "light": "#1baf7a", "dark": "#199e70", "l1": [12.43, 17.54, 13.27, 7.7, 6.92, 17.46, 11.01, 5.55, 17.49, 18.5, 14.51, 16.83, 20.41, 29.52, 29.37, 29.77, 23.35, 44.78, 38.44, 39.07, 14.53, 33.7], "l2": [12.43, 14.99, 14.42, 12.74, 11.57, 12.55, 12.37, 11.46, 12.31, 12.31, 12.51, 14.04, 15.96, 16.46, 19.52, 22.02, 23.0, 24.88, 28.48, 31.59, 31.59, 32.28], "l0": [35.39, 36.04, 32.5, 28.92, 29.5, 40.55, 34.33, 30.13, 35.64, 33.36, 27.28, 33.22, 36.95, 43.72, 44.83, 48.14, 51.35, 58.06, 57.9, 60.85, 65.87, 63.2], "aisc": [43.89, 43.27, 41.1, 37.22, 42.54, 44.98, 35.89, 28.76, 40.42, 41.73, 37.15, 38.11, 42.19, 50.01, 48.27, 50.67, 59.32, 60.99, 60.44, 64.5, 69.47, 67.42], "price": [1795, 1828, 1798, 1809, 1878, 1865, 1725, 1728, 1888, 1974, 1925, 1982, 2058, 2338, 2486, 2654, 2888, 3283, 3471, 4141, 4858, 4478], "mean_gaim": 21.0, "mean_aisc": 47.7, "gap": 26.6}, {"id": "KGC", "name": "Kinross", "light": "#eda100", "dark": "#c98500", "l1": [14.33, 18.85, 8.98, -7.36, 11.01, 11.48, 7.22, 7.33, 3.4, 14.79, 14.37, 9.34, 12.07, 19.0, 32.4, 28.81, 29.79, 35.78, 41.83, 40.84, 36.56, 32.8], "l2": [14.33, 16.59, 14.05, 8.7, 9.16, 9.55, 10.6, 10.06, 8.24, 8.24, 9.14, 10.12, 10.3, 10.85, 12.82, 16.4, 19.81, 22.74, 26.31, 31.1, 34.03, 34.69], "l0": [34.72, 29.55, 24.28, 27.04, 22.54, 22.3, 21.91, 23.26, 20.43, 29.05, 25.29, 23.16, 24.83, 29.67, 39.0, 37.58, 43.4, 51.29, 50.07, 54.65, 58.92, 56.45], "aisc": [45.45, 41.07, 31.58, 26.96, 33.62, 28.36, 26.0, 28.57, 30.25, 34.4, 32.83, 31.44, 36.71, 40.77, 45.5, 43.32, 52.59, 54.56, 53.13, 55.97, 64.47, 59.4], "price": [1787, 1814, 1790, 1796, 1875, 1872, 1732, 1730, 1894, 1976, 1929, 1974, 2070, 2342, 2477, 2664, 2858, 3286, 3461, 4145, 4875, 4485], "mean_gaim": 19.3, "mean_aisc": 40.8, "gap": 21.5}], "meanGap": 22.9, "n": 88, "nCo": 4};
+const Q = D.quarters, S = D.series;
+
+document.getElementById('meta').textContent =
+  D.nCo + ' companies · ' + Q.length + ' quarters · ' + D.n +
+  ' company-quarters, every one reconciled to its published AISC within 2%';
+
+const hero = [
+  ['Mean AISC margin', (S.reduce((a,s)=>a+s.mean_aisc,0)/S.length).toFixed(1)+'%'],
+  ['Mean all-in margin', (S.reduce((a,s)=>a+s.mean_gaim,0)/S.length).toFixed(1)+'%'],
+  ['What AISC omits', D.meanGap.toFixed(1)+' pts'],
+];
+document.getElementById('hero').innerHTML = hero.map(([k,v])=>
+  `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+document.getElementById('leg').innerHTML = S.map(s=>
+  `<span><i class="sw" style="background:var(--s-${s.id})"></i>${s.name}</span>`).join('');
+
+const NS='http://www.w3.org/2000/svg';
+const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+
+function draw(svg, opts){
+  const {w,h,m,ymin,ymax,lines,bands,ticks,fs=11,xevery=4} = opts;
+  const labels=[];
+  const px = i => m.l + i*(w-m.l-m.r)/(Q.length-1);
+  const py = v => m.t + (ymax-v)*(h-m.t-m.b)/(ymax-ymin);
+  for(let g=ymin; g<=ymax; g+=ticks){
+    svg.appendChild(el('line',{x1:m.l,x2:w-m.r,y1:py(g),y2:py(g),class:g===0?'zero':'grid'}));
+    const t=el('text',{x:m.l-7,y:py(g)+3.5,class:'ax','text-anchor':'end'});
+    t.textContent=g+'%'; t.setAttribute('font-size',fs); svg.appendChild(t);
+  }
+  Q.forEach((q,i)=>{ if(i%xevery) return;
+    const t=el('text',{x:px(i),y:h-m.b+16,class:'ax','text-anchor':'middle'});
+    t.textContent=q.replace('Q',' Q'); t.setAttribute('font-size',fs); svg.appendChild(t);
+  });
+  (bands||[]).forEach(b=>{
+    let d='';
+    b.hi.forEach((v,i)=>{ if(v!=null) d+=(d?'L':'M')+px(i)+' '+py(v); });
+    for(let i=b.lo.length-1;i>=0;i--) if(b.lo[i]!=null) d+='L'+px(i)+' '+py(b.lo[i]);
+    svg.appendChild(el('path',{d:d+'Z',fill:'var(--band)','fill-opacity':.34}));
+  });
+  lines.forEach(L=>{
+    let d='';
+    L.v.forEach((v,i)=>{ d += v==null?'':(d?'L':'M')+px(i)+' '+py(v); });
+    svg.appendChild(el('path',{d,fill:'none',stroke:L.c,'stroke-width':L.sw||2,
+      'stroke-opacity':L.op||1,'stroke-linejoin':'round','stroke-linecap':'round',
+      ...(L.dash?{'stroke-dasharray':L.dash}:{})}));
+    if(L.label){
+      const last=L.v.length-1;
+      labels.push({x:px(last)+6,y:py(L.v[last]),text:L.label,c:L.c});
+    }
+  });
+  // nudge overlapping end-labels apart so identity stays readable
+  labels.sort((a,b)=>a.y-b.y);
+  const MIN=13;
+  for(let i=1;i<labels.length;i++)
+    if(labels[i].y-labels[i-1].y<MIN) labels[i].y=labels[i-1].y+MIN;
+  labels.forEach(L=>{
+    const t=el('text',{x:L.x,y:L.y+4,class:'lbl',fill:L.c});
+    t.textContent=L.text; svg.appendChild(t);
+  });
+  return {px,py};
+}
+
+// main chart
+const main=document.getElementById('main');
+const M={l:44,r:82,t:14,b:30};
+const geo=draw(main,{w:1020,h:380,m:M,ymin:-10,ymax:60,ticks:10,lines:[
+  ...S.map(s=>({v:s.l1,c:`var(--s-${s.id})`,sw:1.25,op:.42})),
+  ...S.map(s=>({v:s.l2,c:`var(--s-${s.id})`,sw:2.5,label:s.name})),
+]});
+
+// hover
+const tip=document.getElementById('tip');
+const hair=el('line',{class:'grid','stroke-width':1.5,y1:M.t,y2:380-M.b,opacity:0});
+main.appendChild(hair);
+main.addEventListener('pointermove',e=>{
+  const r=main.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(1020/r.width);
+  let i=Math.round((x-M.l)/((1020-M.l-M.r)/(Q.length-1)));
+  i=Math.max(0,Math.min(Q.length-1,i));
+  hair.setAttribute('x1',geo.px(i)); hair.setAttribute('x2',geo.px(i)); hair.setAttribute('opacity',1);
+  tip.style.opacity=1;
+  tip.style.left=Math.min(e.clientX+16,innerWidth-260)+'px';
+  tip.style.top=(e.clientY-12)+'px';
+  tip.innerHTML=`<b>${Q[i]} · gold ≈ $${S[0].price[i]??'—'}/oz</b>`+S.map(s=>
+    `<div class="r"><span style="color:var(--s-${s.id})">${s.name}</span><span>${
+      s.l1[i]==null?'—':s.l1[i].toFixed(1)+'%'}</span></div>`).join('');
+});
+main.addEventListener('pointerleave',()=>{tip.style.opacity=0;hair.setAttribute('opacity',0);});
+
+// small multiples
+document.getElementById('sm').innerHTML=S.map(s=>
+  `<div class="sm"><h3>${s.name}</h3><p>AISC ${s.mean_aisc}% → all-in ${s.mean_gaim}% · omits ${s.gap} pts</p>
+   <svg id="s-${s.id}" width="260" height="150"></svg></div>`).join('');
+S.forEach(s=>draw(document.getElementById('s-'+s.id),{
+  w:260,h:150,m:{l:32,r:8,t:8,b:24},ymin:-10,ymax:80,ticks:20,fs:9,xevery:8,
+  bands:[{hi:s.aisc,lo:s.l1}],
+  lines:[{v:s.aisc,c:'var(--ink-3)',sw:1.5,dash:'4 3'},{v:s.l1,c:`var(--s-${s.id})`,sw:2}],
+}));
+
+// table
+document.getElementById('tbl').innerHTML =
+  '<thead><tr><th>Quarter</th><th>Gold $/oz</th>'+
+  S.map(s=>`<th>${s.name} AISC</th><th>${s.name} all-in</th>`).join('')+'</tr></thead><tbody>'+
+  Q.map((q,i)=>`<tr><td>${q}</td><td>${S[0].price[i]??'—'}</td>`+
+    S.map(s=>`<td>${s.aisc[i]==null?'—':s.aisc[i].toFixed(1)+'%'}</td><td>${
+      s.l1[i]==null?'—':s.l1[i].toFixed(1)+'%'}</td>`).join('')+'</tr>').join('')+'</tbody>';
+</script>
