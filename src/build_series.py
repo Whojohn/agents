@@ -46,8 +46,18 @@ DEFAULT_BASIS = ("segment_revenue_gold", "segment_revenue_gold")
 # and GAIM reads several points too high.
 ANNUAL_CASH_TAX = {"NEM": {2021: 1534, 2022: 1122, 2023: 794}}
 
-TRIM_FRACTION = 0.15
-TRIM_WINDOW = 8
+# Cash-tax catch-up payments that the company itself attributes to a PRIOR year.
+# Agnico's Q1 2026 release states plainly: "Total cash taxes paid in the first
+# quarter of 2026 were $1.8 billion, which included a $1.3 billion payment for the
+# remaining cash tax liability for 2025." Leaving it in 2026Q1 puts a 44%-of-revenue
+# lump in one quarter and forces the smoother to discard a real observation to hide
+# a pure timing artefact. Reallocating it to the year it was earned fixes the
+# distortion at source instead. {ticker: [(paid_quarter, amount, accrual_year)]}
+TAX_REALLOCATION = {"AEM": [("2026Q1", 1300.0, 2025)]}
+
+TRIM_FRACTION = 0.15    # share of observations flagged as one-offs, by residual size
+MEDIAN_WINDOW = 5       # centred window the residual is measured against
+SMOOTH_WINDOW = 4       # trailing quarters averaged after exclusion
 
 
 def trimmed_mean(values, frac=TRIM_FRACTION):
@@ -78,6 +88,15 @@ def load_company(path):
             share = d.loc[gap, "segment_revenue_gold"] / d.loc[d.year == year, "segment_revenue_gold"].sum()
             d.loc[gap, "cash_tax_paid"] = fy_total * share
             d.loc[gap, "flags"] = d.loc[gap, "flags"].fillna("") + ";CASH_TAX_ALLOCATED_FROM_FY"
+
+    for paid_q, amount, accrual_year in TAX_REALLOCATION.get(ticker, []):
+        src = d.quarter == paid_q
+        tgt = d.year == accrual_year
+        if src.any() and tgt.any():
+            d.loc[src, "cash_tax_paid"] -= amount
+            share = d.loc[tgt, "segment_revenue_gold"] / d.loc[tgt, "segment_revenue_gold"].sum()
+            d.loc[tgt, "cash_tax_paid"] += amount * share
+            d.loc[src | tgt, "flags"] = d.loc[src | tgt, "flags"].fillna("") + ";TAX_REALLOCATED_TO_ACCRUAL_YEAR"
 
     gaim_col, price_col = REVENUE_BASIS.get(ticker, DEFAULT_BASIS)
     rev = d[gaim_col]
@@ -112,26 +131,35 @@ def load_company(path):
     d["aisc_comparable"], d["aisc_basis_note"] = aisc, basis
     d["aisc_margin"] = (1 - aisc / d.realised_price) * 100
     d["gold_revenue"] = rev
+    d["gold_cost_total"] = site_cost + group_cost   # lets the page re-aggregate any subset
     return d
 
 
 def add_trimmed(d):
-    """Rolling two-sided trim over TRIM_WINDOW quarters, per company."""
-    l2, dropped_log = [], []
-    for i in range(len(d)):
-        window = d.L1.iloc[max(0, i - TRIM_WINDOW + 1):i + 1]
-        value, dropped = trimmed_mean(window.tolist())
-        l2.append(value)
-        for v in dropped:
-            src = d.iloc[max(0, i - TRIM_WINDOW + 1):i + 1]
-            match = src[src.L1 == v]
-            if len(match):
-                dropped_log.append({
-                    "ticker": d.ticker.iloc[0], "window_ending": d.quarter.iloc[i],
-                    "trimmed_quarter": match.quarter.iloc[0], "L1_value": round(v, 2),
-                })
-    d["L2"] = l2
-    return d, dropped_log
+    """Flag one-offs by their residual from a rolling median, then smooth the rest.
+
+    The earlier version trimmed the extreme LEVELS inside each rolling window. In a
+    trending series the newest observation is almost always the window extreme, so
+    that method discarded genuine turning points and real state changes -- it threw
+    away Barrick's actual 2022 cost-shock trough from seven consecutive windows and
+    lagged every inflection. Anchoring on the residual from a rolling median instead
+    means a point is only excluded when it departs from its OWN local trend, which
+    is what "one-off" actually means.
+    """
+    med = d.L1.rolling(MEDIAN_WINDOW, center=True, min_periods=2).median()
+    resid = (d.L1 - med).abs()
+    cutoff = resid.quantile(1 - TRIM_FRACTION)          # the 15% most anomalous points
+    keep = resid <= cutoff
+
+    kept = d.L1.where(keep)
+    d["L2"] = kept.rolling(SMOOTH_WINDOW, min_periods=1).mean()
+    d["is_outlier"] = ~keep
+
+    log = [{"ticker": d.ticker.iloc[0], "quarter": r.quarter, "L1_value": round(r.L1, 2),
+            "rolling_median": round(med.iloc[i], 2), "residual": round(resid.iloc[i], 2),
+            "cutoff": round(cutoff, 2)}
+           for i, r in enumerate(d.itertuples()) if not keep.iloc[i]]
+    return d, log
 
 
 def build_annual(frames):
@@ -179,7 +207,8 @@ def main():
 
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
             "w_gold", "L0a", "aisc_margin", "L1", "L2", "published_aisc",
-            "aisc_comparable", "aisc_basis_note", "recon_residual_pct", "flags"]
+            "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
+            "is_outlier", "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
     out.to_csv(FINAL / "margins.csv", index=False)
     annual = build_annual(frames)

@@ -99,6 +99,13 @@ for t in ORDER:
         "revenueSrc": m["revenue_src"], "opcostSrc": m["opcost_src"],
         "aiscNote": m["aisc_note"], "quirks": m["quirks"],
         "l1": col(gq, quarters, "quarter", "L1"), "l2": col(gq, quarters, "quarter", "L2"),
+        # revenue and cost totals let the page re-aggregate any company subset
+        "rev": col(gq, quarters, "quarter", "gold_revenue"),
+        "cost": col(gq, quarters, "quarter", "gold_cost_total"),
+        "aiscUsd": col(gq, quarters, "quarter", "aisc_comparable"),
+        "oz": [None if pd.isna(v) else int(v) for v in
+               (gq.set_index("quarter").gold_oz_sold.reindex(quarters))],
+        "aRev": col(ga, years, "year", "gold_revenue"),
         "l0": col(gq, quarters, "quarter", "L0a"), "aisc": col(gq, quarters, "quarter", "aisc_margin"),
         "price": col(gq, quarters, "quarter", "realised_price"),
         "aL1": col(ga, years, "year", "L1"), "aL0": col(ga, years, "year", "L0a"),

@@ -226,3 +226,4 @@ node_modules/
 package-lock.json
 shot.mjs
 charts/*.png
+crop.mjs
