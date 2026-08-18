@@ -94,10 +94,18 @@ MANIFEST_PATH = os.path.join(RAW_DIR, "manifest.csv")
 COVERAGE_PATH = os.path.join(RAW_DIR, "coverage_matrix.csv")
 LOG_PATH = os.path.join(RAW_DIR, "fetch_filings.log")
 
-MIN_EXHIBIT_BYTES = 15_000  # "~20KB" threshold from the brief, applied a
-                             # touch more leniently so borderline-but-real
-                             # exhibits (e.g. a compact operating-stats
-                             # table) are not silently dropped.
+MIN_EXHIBIT_BYTES = 8_000   # "~20KB" threshold from the brief, lowered after
+                             # verification: a real Gold Fields H1-2026
+                             # trading-statement/operating-update exhibit
+                             # (containing genuine AISC/production/EPS
+                             # figures) was found at 12,065 bytes -- i.e.
+                             # below the naive ~15-20KB cutoff. The generic
+                             # 6-K "cover" boilerplate docs that the size
+                             # filter is meant to exclude were empirically
+                             # observed clustering at exactly ~15.0-15.5KB,
+                             # so 8KB still screens those out while no
+                             # longer dropping short-but-substantive
+                             # exhibits like trading statements.
 KEEP_EXTENSIONS = {".htm", ".html", ".pdf"}
 
 RATE_LIMIT_PER_SEC = 5.0
