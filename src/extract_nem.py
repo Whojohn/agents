@@ -80,6 +80,10 @@ for y in range(2021,2027):
             derived=True
         net_int = None if (ie is None) else ((-ie) - (ii if ii is not None else 0.0))
         ni_gross_flag = (ii is None)
+        bp = byproduct_aisc(key)
+        cred, credsrc = byproduct_credits(key)
+        for extra in ([bp['src']] if bp else [])+[credsrc]:
+            if extra not in srcs: srcs.append(extra)
         recon = published = resid = None
         if aisc and ozs:
             recon = sum(aisc[0:7])*1e6/ozs
@@ -99,7 +103,9 @@ for y in range(2021,2027):
             capex_total=m(cap), reclamation_accretion=m(acc), lease_payments=m(lease),
             net_interest=m(net_int), cash_tax_paid=m(tax),
             gold_oz_sold=int(ozs), gold_oz_produced=int(ozp),
-            published_aisc=published, aisc_basis='co-product', published_aic=None,
+            published_aisc=published, aisc_basis='co-product',
+            published_aisc_byproduct=bp['published'] if bp else None,
+            published_aic=None, byproduct_credits=cred,
             net_income_attributable=m(ni),
             recon_aisc=None if recon is None else round(recon,1),
             recon_residual_pct=None if resid is None else round(resid,3),
@@ -109,7 +115,7 @@ json.dump(out, open('/tmp/claude-0/-home-user-agents/f3c15123-340b-5994-9540-4d1
 COLS=['ticker','quarter','period_start','period_end','basis','segment_revenue_gold','total_revenue',
  'opcost_ex_dda','segment_dda','royalties','corporate_g_and_a','exploration_expensed','capex_total',
  'reclamation_accretion','lease_payments','net_interest','cash_tax_paid','gold_oz_sold','gold_oz_produced',
- 'published_aisc','aisc_basis','published_aic','net_income_attributable','recon_aisc','recon_residual_pct',
+ 'published_aisc','aisc_basis','published_aisc_byproduct','published_aic','byproduct_credits','net_income_attributable','recon_aisc','recon_residual_pct',
  'flags','source_file']
 import os
 os.makedirs('data/interim',exist_ok=True)
@@ -119,4 +125,4 @@ with open('data/interim/NEM_quarterly.csv','w',newline='') as fh:
         w.writerow({c:('' if r[c] is None else r[c]) for c in COLS})
 print("rows",len(out))
 for r in out:
-    print(f"{r['quarter']} resid={r['recon_residual_pct']:>7} recon={r['recon_aisc']:>7} pub={r['published_aisc']:>6} capsrc={r['_capsrc']}")
+    print(f"{r['quarter']} resid={r['recon_residual_pct']:>7} co-product={r['published_aisc']:>6} by-product={r['published_aisc_byproduct']:>6} credits={r['byproduct_credits']:>6}")

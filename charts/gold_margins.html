@@ -1,51 +1,52 @@
-<title>Gold All-In Margin</title>
+<title>黄金矿业全成本利润率</title>
 <style>
   :root {
     color-scheme: light;
-    --surface: #fcfcfb; --panel: #f6f5f2; --line: #e2e0da;
+    --surface: #fcfcfb; --panel: #f6f5f2; --line: #e2e0da; --line-2: #d3d1c9;
     --ink: #0b0b0b; --ink-2: #52514e; --ink-3: #83817a;
     --s-NEM: #2a78d6; --s-GOLD: #eb6834; --s-AEM: #1baf7a; --s-KGC: #eda100;
-    --band: #cbd5e1;
+    --band: #cbd5e1; --accent: #2a78d6;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --surface: #1a1a19; --panel: #232322; --line: #383835;
+      --surface: #1a1a19; --panel: #232322; --line: #383835; --line-2: #4a4a46;
       --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e85;
       --s-NEM: #3987e5; --s-GOLD: #d95926; --s-AEM: #199e70; --s-KGC: #c98500;
-      --band: #3f4a57;
+      --band: #3f4a57; --accent: #3987e5;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --surface: #1a1a19; --panel: #232322; --line: #383835;
+    --surface: #1a1a19; --panel: #232322; --line: #383835; --line-2: #4a4a46;
     --ink: #ffffff; --ink-2: #c3c2b7; --ink-3: #8f8e85;
     --s-NEM: #3987e5; --s-GOLD: #d95926; --s-AEM: #199e70; --s-KGC: #c98500;
-    --band: #3f4a57;
+    --band: #3f4a57; --accent: #3987e5;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 40px 24px 72px; background: var(--surface); color: var(--ink);
-    font: 15px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font: 15px/1.75 ui-sans-serif, -apple-system, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
   .wrap { max-width: 1080px; margin: 0 auto; }
-  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+  h1 { font-size: 31px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -0.01em; }
   .sub { color: var(--ink-2); margin: 0 0 4px; font-size: 16px; }
-  .meta { color: var(--ink-3); font-size: 13px; margin: 0 0 36px; }
-  h2 { font-size: 18px; margin: 44px 0 6px; letter-spacing: -0.01em; }
-  h2 .n { color: var(--ink-3); font-weight: 400; font-size: 14px; margin-left: 8px; }
-  .note { color: var(--ink-2); font-size: 13.5px; margin: 0 0 18px; max-width: 74ch; }
-  .hero {
-    display: flex; gap: 32px; flex-wrap: wrap; padding: 20px 24px; margin: 0 0 8px;
-    background: var(--panel); border-radius: 10px;
-  }
-  .hero div { min-width: 128px; }
-  .hero .k { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em; }
-  .hero .v { font-size: 27px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
+  .meta { color: var(--ink-3); font-size: 13px; margin: 0 0 34px; }
+  h2 { font-size: 19px; margin: 48px 0 6px; letter-spacing: -0.01em; }
+  h2 .n { color: var(--ink-3); font-weight: 400; font-size: 14px; margin-right: 8px; }
+  h3 { font-size: 15.5px; margin: 26px 0 8px; }
+  .note { color: var(--ink-2); font-size: 13.5px; margin: 0 0 18px; max-width: 78ch; }
+  .hero { display: flex; gap: 30px; flex-wrap: wrap; padding: 20px 24px; margin: 0 0 8px;
+          background: var(--panel); border-radius: 10px; }
+  .hero div { min-width: 132px; }
+  .hero .k { font-size: 12px; color: var(--ink-3); letter-spacing: 0.03em; }
+  .hero .v { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px;
+             font-variant-numeric: tabular-nums; }
   .legend { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 10px; font-size: 13.5px; color: var(--ink-2); }
   .legend span { display: inline-flex; align-items: center; gap: 7px; }
-  .sw { width: 13px; height: 3px; border-radius: 2px; display: inline-block; }
+  .sw { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
   figure { margin: 0; }
   .scroll { overflow-x: auto; }
   svg { display: block; max-width: 100%; }
@@ -53,165 +54,298 @@
   .zero { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
   .ax { fill: var(--ink-3); font-size: 11px; }
   .lbl { font-size: 12px; font-weight: 600; }
-  .small { display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 18px; }
+  .small { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 18px; }
   .sm { background: var(--panel); border-radius: 10px; padding: 14px 14px 8px; }
-  .sm h3 { margin: 0 0 2px; font-size: 14.5px; }
-  .sm p { margin: 0 0 8px; font-size: 12px; color: var(--ink-3); }
+  .sm h4 { margin: 0 0 2px; font-size: 14.5px; }
+  .sm p { margin: 0 0 8px; font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
   table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
-  th, td { padding: 5px 9px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
-  th:first-child, td:first-child { text-align: left; }
-  thead th { color: var(--ink-3); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
-  details { margin-top: 12px; }
-  summary { cursor: pointer; color: var(--ink-2); font-size: 13.5px; padding: 6px 0; }
-  #tip {
-    position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
-    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-    padding: 9px 11px; font-size: 12.5px; box-shadow: 0 6px 22px rgb(0 0 0 / .16);
-    font-variant-numeric: tabular-nums; z-index: 9; max-width: 250px;
-  }
+  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; white-space: nowrap; }
+  thead th { color: var(--ink-3); font-weight: 500; font-size: 11.5px; }
+  .cmp td, .cmp th { text-align: left; vertical-align: top; font-size: 13px; line-height: 1.6; }
+  .cmp td:first-child { font-weight: 600; white-space: normal; width: 27%; }
+  .cmp .yes { color: var(--s-AEM); font-weight: 600; }
+  .cmp .no { color: var(--s-GOLD); font-weight: 600; }
+  details { margin: 10px 0; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+  details[open] { padding-bottom: 6px; }
+  summary { cursor: pointer; padding: 12px 16px; font-size: 14.5px; font-weight: 600; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; color: var(--ink-3); }
+  details[open] summary::before { content: "▾ "; }
+  summary .tag { font-weight: 400; color: var(--ink-3); font-size: 12.5px; margin-right: 8px; }
+  .body { padding: 0 16px 6px; font-size: 13.5px; color: var(--ink-2); }
+  .body b { color: var(--ink); }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 14px; }
+  .kv dt { color: var(--ink-3); font-size: 12.5px; }
+  .kv dd { margin: 0; }
+  .body ul { margin: 6px 0 14px; padding-right: 0; padding-left: 20px; }
+  .body li { margin-bottom: 7px; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+  pre.f { background: var(--panel); border: 1px solid var(--line); border-radius: 9px;
+          padding: 15px 17px; overflow-x: auto; font-size: 12.5px; line-height: 1.65; margin: 0 0 16px; }
+  a { color: var(--accent); }
+  .btn { font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 7px; cursor: pointer;
+         border: 1px solid var(--line-2); background: var(--panel); color: var(--ink); }
+  .btn:hover { border-color: var(--ink-3); }
+  .exp { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; }
+  textarea { width: 100%; height: 190px; font-family: ui-monospace, Menlo, monospace; font-size: 11.5px;
+             background: var(--panel); color: var(--ink-2); border: 1px solid var(--line);
+             border-radius: 9px; padding: 11px; resize: vertical; }
+  #tip { position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
+         background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px;
+         padding: 9px 12px; font-size: 12.5px; box-shadow: 0 6px 22px rgb(0 0 0 / .16);
+         font-variant-numeric: tabular-nums; z-index: 9; }
   #tip b { display: block; margin-bottom: 5px; font-size: 12px; color: var(--ink-2); }
-  #tip .r { display: flex; justify-content: space-between; gap: 14px; }
-  footer { margin-top: 52px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12.5px; }
-  footer p { margin: 0 0 7px; max-width: 82ch; }
+  #tip .r { display: flex; justify-content: space-between; gap: 16px; }
+  footer { margin-top: 54px; padding-top: 18px; border-top: 1px solid var(--line);
+           color: var(--ink-3); font-size: 12.5px; }
+  footer p { margin: 0 0 8px; max-width: 84ch; }
 </style>
 
 <div class="wrap">
-  <h1>What AISC hides</h1>
-  <p class="sub">Quarterly gold-segment profit margin for the four largest gold miners with genuine quarterly financial statements, 2021&nbsp;Q1&nbsp;–&nbsp;2026&nbsp;Q2.</p>
+  <h1>AISC 隐藏了什么</h1>
+  <p class="sub">全球主要金矿企业的黄金板块季度与年度利润率，2021&nbsp;Q1&nbsp;–&nbsp;2026&nbsp;Q2。自财报正向计算，并以各公司自行公布的 AISC 反算校验。</p>
   <p class="meta" id="meta"></p>
 
   <div class="hero" id="hero"></div>
 
-  <h2>All-in margin, by company<span class="n">GAIM — every cost a shareholder bears</span></h2>
-  <p class="note">Computed forward from the filings: gold-segment revenue less operating cost, royalties, allocated corporate overhead, all exploration, <em>total</em> capital expenditure, reclamation, leases, net interest and cash taxes paid. Thin line is raw; thick line is the two-sided 15% trimmed series.</p>
+  <h2><span class="n">季度</span>全成本利润率（GAIM）</h2>
+  <p class="note">自财报正向计算：黄金板块收入，扣除经营成本、权利金、按收入占比分摊的公司管理费、全部勘探费用、<b>资本开支总额</b>、复垦、租赁、净利息与已付现金税。细线为原始序列，粗线为双侧 15% 截尾后的平滑序列。</p>
   <div class="legend" id="leg"></div>
-  <figure class="scroll"><svg id="main" width="1020" height="380" role="img" aria-label="All-in gold margin by company, 2021 to 2026"></svg></figure>
+  <figure class="scroll"><svg id="mainQ" width="1020" height="380" role="img" aria-label="季度全成本利润率折线图"></svg></figure>
 
-  <h2>The gap is the product<span class="n">AISC margin vs all-in margin</span></h2>
-  <p class="note">Upper line is the industry-standard AISC margin; lower line is the all-in margin. The shaded band is the cost AISC leaves out — growth capital, greenfield exploration, tax, interest and financing.</p>
+  <h2><span class="n">年度</span>全成本利润率（GAIM）</h2>
+  <p class="note">年度并非四个季度利润率的平均，而是<b>先把各行项目按年汇总、再做一次除法</b>——否则小季度会与大季度等权。<b id="partialNote"></b></p>
+  <figure class="scroll"><svg id="mainA" width="1020" height="330" role="img" aria-label="年度全成本利润率折线图"></svg></figure>
+
+  <h2><span class="n">核心</span>差距本身就是结论</h2>
+  <p class="note">上方虚线为行业通用的 AISC 利润率，下方实线为全成本利润率。阴影带即 AISC 未计入的成本——成长性资本开支、绿地勘探、所得税、利息与融资。<b>四家的 AISC 已统一换算到「副产品口径、每销售盎司」再比较</b>：各公司原始披露分属四种不同惯例（纽蒙特头条用共同产品、金罗斯用黄金当量、艾格尼可按<b>产出</b>盎司计价），不换算就会把披露选择误读成经营差异——未换算时纽蒙特的差距显示为 18.9 个百分点，换算后是 22.8。</p>
   <div class="small" id="sm"></div>
 
-  <details>
-    <summary>Show the underlying numbers</summary>
-    <div class="scroll"><table id="tbl"></table></div>
-  </details>
+  <h2><span class="n">口径</span>GAIM 与 AISC 的完整差异</h2>
+  <p class="note">AISC 回答的是「这个矿是否值得继续开着」；GAIM 回答的是「这门生意是否覆盖了它存在的全部代价」。下表逐项列出两者的差别，以及每一项是否为股东最终承担的真实成本。</p>
+  <div class="scroll"><table class="cmp" id="cmp"></table></div>
+
+  <h2><span class="n">数据</span>导出</h2>
+  <p class="note">页面所在的沙箱会拦截由页面自身发起的文件下载，因此这里提供复制到剪贴板与全选文本两种方式。</p>
+  <div class="exp">
+    <button class="btn" id="copyQ">复制季度数据 CSV</button>
+    <button class="btn" id="copyA">复制年度数据 CSV</button>
+    <span id="copied" style="color:var(--ink-3);font-size:13px"></span>
+  </div>
+  <textarea id="csv" readonly spellcheck="false"></textarea>
+
+  <h2><span class="n">附录</span>完整计算说明</h2>
+  <p class="note">下列每一家均可展开，内含该公司的申报主体、数据下载地址、收入与成本的确切科目原文，以及抽取过程中遇到的全部陷阱。所有数字均自本地下载的原始申报文件按表格单元格解析，未经任何摘要环节。</p>
+
+  <h3>统一公式</h3>
+  <pre class="f" id="formula"></pre>
+
+  <h3>数据来源与分公司口径</h3>
+  <div id="appendix"></div>
 
   <footer>
-    <p><b>Method.</b> Financial statements are the input; AISC is the checksum. For every company-quarter the same extracted line items are re-aggregated per the World Gold Council build-up and tied back to the company's own published AISC — a residual above 2% means the filing was misread and the observation is rejected. All 88 observations passed. Mean absolute residual by company: Kinross 0.02%, Newmont 0.04%, Barrick 0.14%, Agnico 0.22%; worst single observation 1.30%.</p>
-    <p><b>Smoothing.</b> Rolling 8-quarter window; the top and bottom <span style="white-space:nowrap">⌊0.15 × 8⌋ = 1</span> observation is dropped from each tail and the middle six averaged. A trim discards extremes rather than capping them, so one catastrophic quarter cannot drag the line. Every dropped observation is logged to <code>trimmed_observations.csv</code>.</p>
-    <p><b>Validation.</b> Implied realised price (gold revenue ÷ ounces sold) converges across all four independently extracted datasets to within ~1% in every quarter — no external gold price was used anywhere in this pipeline. The AISC margin exceeds the all-in margin in all 88 observations, as it must.</p>
-    <p><b>Not shown.</b> AngloGold Ashanti and Gold Fields publish full financial statements only half-yearly and are excluded from this quarterly view rather than interpolated.</p>
+    <p><b>方法方向。</b>财务报表是输入，AISC 是校验和，绝不相反。每一个公司季度，都用同一批抽取出来的行项目按世界黄金协会（WGC）的加总规则反推 AISC，再与该公司自己公布的数字对账；残差超过 2% 即视为财报被读错，该观测作废重抠。全部 88 个观测通过。</p>
+    <p><b>为什么不用外部金价。</b>整条管线未使用任何外部金价序列。收入直接读自分部附注与按金属拆分的收入附注，绝不用「市场金价 × 盎司数」倒推。作为副产品，四套完全独立抽取的数据所隐含的实现金价，在每个季度都收敛到约 1% 以内——这是抽取正确性的独立证据，而非校准的结果。</p>
+    <p><b>平滑方式。</b>8 个季度滚动窗口，排序后两端各丢弃 ⌊0.15 × 8⌋ = 1 个观测，取中间 6 个的均值。<b>需要说清楚的算术：每端 1 个即每端 12.5%、合计丢弃窗口的 25%</b>，把它称作「15% 截尾」低估了它的力度。选截尾而非缩尾，是因为截尾<b>丢弃</b>极端值而非把它压到阈值，单个灾难性季度对平滑线毫无拉扯；且纯统计不含「哪些事件算一次性」的分析师裁量——那正是利润率序列被悄悄操纵的地方。每一个被截掉的观测都记录在 <code>trimmed_observations.csv</code>。</p>
+    <p><b>已知问题（由独立稽核组发现，如实列出而非隐去）。</b>其一，巴里克的资本开支含资本化利息，而净利息取的是资本化前的利息费用总额，同一笔钱在两处各计一次，违反了我们自己的「不重叠」规则，每季度约高估 0.5 个百分点；相反方向上，其以增值税应收账款抵缴的所得税（2022 全年 1.26 亿美元）未被现金税捕捉，约低估 0.3–0.8 个百分点。其二，截尾平滑在趋势序列中会把最新观测系统性当作窗口极值丢弃，因而在每个拐点处滞后，并且确实抹掉了 2022 年那次真实的成本冲击谷底（巴里克 2022Q3 被连续 7 个窗口排除）——所以本页把原始序列与平滑序列同时画出，平滑线不单独使用。其三，原始<b>单季</b> GAIM 的公司间相关系数只有 0.38，改用滚动四季后回到 0.84，说明单季数字受现金税缴纳时点主导，不应作为排名依据。</p>
+    <p><b>未纳入本图者。</b>AngloGold Ashanti 与 Gold Fields 仅按半年披露完整财务报表，因此不进入这张季度图，也不做插值填补。紫金矿业、山东黄金按中国证监会规则按季披露，但不采用 AISC 体系、以人民币记账、按产品线而非矿山分部，需单独处理。Polyus 与 Polymetal 受制裁后披露中断。</p>
   </footer>
 </div>
 <div id="tip"></div>
 
 <script>
-const D = {"quarters": ["2021Q1", "2021Q2", "2021Q3", "2021Q4", "2022Q1", "2022Q2", "2022Q3", "2022Q4", "2023Q1", "2023Q2", "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4", "2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2"], "series": [{"id": "NEM", "name": "Newmont", "light": "#2a78d6", "dark": "#3987e5", "l1": [21.85, 23.81, 17.54, 21.52, 20.72, 13.42, 1.34, 8.51, 10.34, 6.75, 3.88, 7.28, 16.85, 19.42, 18.9, 28.05, 25.57, 32.78, 37.58, 45.46, 44.07, 33.54], "l2": [21.85, 22.83, 21.07, 21.18, 21.09, 19.81, 19.01, 17.26, 15.34, 12.88, 10.6, 8.36, 8.36, 8.94, 11.44, 13.26, 15.8, 19.35, 23.6, 27.05, 31.24, 33.6], "l0": [38.72, 40.68, 34.42, 37.15, 35.24, 32.15, 24.04, 29.29, 29.35, 29.87, 29.38, 30.83, 34.39, 38.59, 40.05, 48.32, 47.82, 52.97, 56.22, 63.41, 65.23, 57.68], "aisc": [40.68, 43.17, 36.97, 41.31, 38.89, 34.72, 24.77, 30.88, 27.82, 25.1, 25.73, 25.92, 31.13, 33.48, 35.97, 44.68, 43.92, 52.02, 55.76, 61.56, 65.12, 56.1], "price": [1752, 1821, 1777, 1799, 1892, 1837, 1689, 1758, 1906, 1965, 1920, 2005, 2089, 2348, 2516, 2645, 2944, 3320, 3540, 4215, 4899, 4415], "mean_gaim": 20.9, "mean_aisc": 39.8, "gap": 18.9}, {"id": "GOLD", "name": "Barrick", "light": "#eb6834", "dark": "#d95926", "l1": [26.36, 9.95, 12.62, 27.47, 16.67, 8.12, 0.06, 1.87, 8.93, 6.62, 13.37, 11.29, 9.92, 10.02, 20.43, 23.21, 18.79, 17.56, 30.84, 30.88, 40.06, 19.09], "l2": [26.36, 18.16, 16.31, 19.1, 18.61, 16.86, 14.74, 12.6, 9.69, 9.14, 9.26, 8.37, 7.79, 8.11, 10.02, 12.33, 13.97, 15.24, 16.88, 20.14, 23.62, 23.87], "l0": [40.67, 39.9, 37.06, 40.81, 37.28, 34.69, 28.5, 25.96, 27.25, 32.47, 33.35, 30.68, 30.7, 37.62, 40.36, 45.78, 43.71, 49.21, 55.1, 54.98, 60.74, 55.01], "aisc": [42.65, 40.35, 41.59, 45.86, 37.96, 34.86, 26.36, 28.06, 27.95, 31.29, 34.94, 31.31, 28.99, 36.07, 39.61, 45.35, 38.71, 48.91, 55.52, 62.15, 64.58, 57.74], "price": [1775, 1822, 1770, 1793, 1876, 1861, 1723, 1726, 1901, 1972, 1929, 1986, 2076, 2343, 2495, 2655, 2896, 3296, 3458, 4177, 4822, 4416], "mean_gaim": 16.6, "mean_aisc": 40.9, "gap": 24.4}, {"id": "AEM", "name": "Agnico Eagle", "light": "#1baf7a", "dark": "#199e70", "l1": [12.43, 17.54, 13.27, 7.7, 6.92, 17.46, 11.01, 5.55, 17.49, 18.5, 14.51, 16.83, 20.41, 29.52, 29.37, 29.77, 23.35, 44.78, 38.44, 39.07, 14.53, 33.7], "l2": [12.43, 14.99, 14.42, 12.74, 11.57, 12.55, 12.37, 11.46, 12.31, 12.31, 12.51, 14.04, 15.96, 16.46, 19.52, 22.02, 23.0, 24.88, 28.48, 31.59, 31.59, 32.28], "l0": [35.39, 36.04, 32.5, 28.92, 29.5, 40.55, 34.33, 30.13, 35.64, 33.36, 27.28, 33.22, 36.95, 43.72, 44.83, 48.14, 51.35, 58.06, 57.9, 60.85, 65.87, 63.2], "aisc": [43.89, 43.27, 41.1, 37.22, 42.54, 44.98, 35.89, 28.76, 40.42, 41.73, 37.15, 38.11, 42.19, 50.01, 48.27, 50.67, 59.32, 60.99, 60.44, 64.5, 69.47, 67.42], "price": [1795, 1828, 1798, 1809, 1878, 1865, 1725, 1728, 1888, 1974, 1925, 1982, 2058, 2338, 2486, 2654, 2888, 3283, 3471, 4141, 4858, 4478], "mean_gaim": 21.0, "mean_aisc": 47.7, "gap": 26.6}, {"id": "KGC", "name": "Kinross", "light": "#eda100", "dark": "#c98500", "l1": [14.33, 18.85, 8.98, -7.36, 11.01, 11.48, 7.22, 7.33, 3.4, 14.79, 14.37, 9.34, 12.07, 19.0, 32.4, 28.81, 29.79, 35.78, 41.83, 40.84, 36.56, 32.8], "l2": [14.33, 16.59, 14.05, 8.7, 9.16, 9.55, 10.6, 10.06, 8.24, 8.24, 9.14, 10.12, 10.3, 10.85, 12.82, 16.4, 19.81, 22.74, 26.31, 31.1, 34.03, 34.69], "l0": [34.72, 29.55, 24.28, 27.04, 22.54, 22.3, 21.91, 23.26, 20.43, 29.05, 25.29, 23.16, 24.83, 29.67, 39.0, 37.58, 43.4, 51.29, 50.07, 54.65, 58.92, 56.45], "aisc": [45.45, 41.07, 31.58, 26.96, 33.62, 28.36, 26.0, 28.57, 30.25, 34.4, 32.83, 31.44, 36.71, 40.77, 45.5, 43.32, 52.59, 54.56, 53.13, 55.97, 64.47, 59.4], "price": [1787, 1814, 1790, 1796, 1875, 1872, 1732, 1730, 1894, 1976, 1929, 1974, 2070, 2342, 2477, 2664, 2858, 3286, 3461, 4145, 4875, 4485], "mean_gaim": 19.3, "mean_aisc": 40.8, "gap": 21.5}], "meanGap": 22.9, "n": 88, "nCo": 4};
-const Q = D.quarters, S = D.series;
+const D = {"quarters": ["2021Q1", "2021Q2", "2021Q3", "2021Q4", "2022Q1", "2022Q2", "2022Q3", "2022Q4", "2023Q1", "2023Q2", "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4", "2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2"], "years": [2021, 2022, 2023, 2024, 2025, 2026], "series": [{"id": "NEM", "name": "纽蒙特", "en": "Newmont Corporation", "light": "#2a78d6", "dark": "#3987e5", "cik": "0001164727", "exchange": "NYSE: NEM（美国本土申报人）", "forms": "10-Q（季度财务报表）· 10-K（年报）· 8-K 附件 EX-99.1（业绩新闻稿与经营统计表）", "revenueSrc": "10-Q 管理层讨论与分析「Consolidated sales:」表的 <b>Net</b> 行、Gold 列，科目原文 <b>Consolidated gold sales, net</b>。另由 Note 5 按矿山与金属拆分的收入附注独立验算，22 个季度差额均为 0。", "opcostSrc": "利润表 <b>Costs applicable to sales</b>（附注声明已剔除折旧摊销与复垦），分部附注 Gold 各行加总", "aiscNote": "10-K/10-Q 头条为<b>共同产品</b>口径（按 GEO 牌价的相对销售价值分摊），8-K 另发<b>副产品</b>口径。2026 年起公司把指引改为副产品口径。两者差距在 2026Q1 达 66%。", "quirks": ["分部结构在窗口内变过两次：2023Q1 从「五大地理区域」改为「按矿山」，2023Q4 并入 Newcrest 后再调整，均已追溯重述。但 2021–2022 的 10-Q 自愿披露了矿山层明细，所以矿山层面板是连续的。", "现金税 2024Q1 前无季度披露。2021–2023 由 10-K 审计年度数（1,534 / 1,122 / 794 百万美元）按季度黄金收入占比分摊，逐行打 <code>CASH_TAX_ALLOCATED_FROM_FY</code> 标志。", "「归属口径」只有盎司数有，收入与成本各行<b>只有合并口径</b>，全行打 <code>ONLY_CONSOLIDATED</code>。", "内华达金矿（NGM）按 <b>38.5% 比例合并</b>；Barrick 则 100% 全额合并再挂少数股东权益。两家在这一点上永久不可比。", "白银单位在 2021 年报「千盎司」、2026 年报「百万盎司」，同一张表相差 762 倍——解析器按科目文字读单位，不用固定乘数。"], "l1": [21.85, 23.81, 17.54, 21.52, 20.72, 13.42, 1.34, 8.51, 10.34, 6.75, 3.88, 7.28, 16.85, 19.42, 18.9, 28.05, 25.57, 32.78, 37.58, 45.46, 44.07, 33.54], "l2": [21.85, 22.83, 21.07, 21.18, 21.09, 19.81, 19.01, 17.26, 15.34, 12.88, 10.6, 8.36, 8.36, 8.94, 11.44, 13.26, 15.8, 19.35, 23.6, 27.05, 31.24, 33.6], "l0": [38.72, 40.68, 34.42, 37.15, 35.24, 32.15, 24.04, 29.29, 29.35, 29.87, 29.38, 30.83, 34.39, 38.59, 40.05, 48.32, 47.82, 52.97, 56.22, 63.41, 65.23, 57.68], "aisc": [45.59, 49.6, 41.41, 46.37, 45.23, 31.34, 24.95, 31.11, 28.98, 22.1, 23.59, 23.18, 34.29, 39.86, 38.71, 50.13, 50.85, 58.59, 63.19, 69.11, 79.0, 63.28], "price": [1751.59, 1821.33, 1776.84, 1799.38, 1891.65, 1836.71, 1689.43, 1757.76, 1906.46, 1965.32, 1920.0, 2004.57, 2089.43, 2348.02, 2515.94, 2644.61, 2943.83, 3320.29, 3539.8, 4214.8, 4899.35, 4415.06], "aL1": [21.22, 11.2, 7.15, 21.39, 36.17, 39.2], "aL0": [37.75, 30.29, 29.96, 41.05, 55.77, 61.7], "aAisc": [45.81, 33.19, 24.29, 41.54, 61.16, 71.67], "aPrice": [1788.0, 1792.0, 1954.0, 2408.0, 3498.0, 4661.0], "meanGaim": 20.9, "meanAisc": 43.7, "gap": 22.8, "residMean": 0.041, "residMax": 0.208}, {"id": "GOLD", "name": "巴里克", "en": "Barrick Mining Corporation", "light": "#eb6834", "dark": "#d95926", "cik": "0000756894", "exchange": "NYSE: B（2025年5月由 GOLD 改）· TSX: ABX（外国私募发行人）", "forms": "6-K 附件 EX-99.1（新闻稿）与 EX-99.2（管理层讨论 + 简明中期财务报表）· 40-F（年报）", "revenueSrc": "管理层讨论 <b>Revenues - as adjusted</b>（归属口径，2026Q1 = 3,607 百万美元）。另在合并口径记 Note 6 <b>Gold sales</b>（4,756）。", "opcostSrc": "Note 7 <b>Site operating costs</b>。注意：黄金 <b>Cost of sales</b> <u>包含</u>权利金，Site operating costs 才是不含的那行——22 个季度用恒等式验证。", "aiscNote": "头条为<b>副产品</b>口径。其所谓「共同产品」经核实<b>只是把副产品抵扣加回去</b>，并未把联合成本分摊给副产品，因此<b>不可</b>与纽蒙特、自由港的真共同产品数字比较。2024Q2 后停止披露 AIC，改用 AISC 对账。", "quirks": ["报表有<b>四列</b>（本季/去年同季/本半年/去年同半年），管理层讨论的非GAAP表却是<b>五列</b>且第二列是<b>上一季</b>而非去年同季。同一份文件里「第二列」有两种含义——解析器一律按表头文字定位，绝不按列序。", "Kibali（45%）与 Porgera（24.5%）<b>权益法核算</b>，收入完全不进合并报表，却<b>计入</b>公布 AISC 的归属盎司分母。因此只有已对账的归属收入口径与之自洽。", "2025Q1 起 Note 7 新增「Mining and production taxes」行，是<b>从 Site operating costs 里切出来的</b>，不是从 Royalty expense。故 2025Q1 前后 royalties 单列不可比，但两者之和连续，GAIM 不受影响。", "2025Q4 租赁付款为空：审计年度数 12 小于九个月数 20，倒算为 −8，不成立。公司做了重述，该格留空而非强填 0。", "盎司数<b>只披露到千盎司</b>，任何每盎司指标含最多 ±0.07% 的舍入。"], "l1": [26.36, 9.95, 12.62, 27.47, 16.67, 8.12, 0.06, 1.87, 8.93, 6.62, 13.37, 11.29, 9.92, 10.02, 20.43, 23.21, 18.79, 17.56, 30.84, 30.88, 40.06, 19.09], "l2": [26.36, 18.16, 16.31, 19.1, 18.61, 16.86, 14.74, 12.6, 9.69, 9.14, 9.26, 8.37, 7.79, 8.11, 10.02, 12.33, 13.97, 15.24, 16.88, 20.14, 23.62, 23.87], "l0": [40.67, 39.9, 37.06, 40.81, 37.28, 34.69, 28.5, 25.96, 27.25, 32.47, 33.35, 30.68, 30.7, 37.62, 40.36, 45.78, 43.71, 49.21, 55.1, 54.98, 60.74, 55.01], "aisc": [42.65, 40.35, 41.59, 45.86, 37.96, 34.86, 26.36, 28.06, 27.95, 31.29, 34.94, 31.31, 28.99, 36.07, 39.61, 45.35, 38.71, 48.91, 55.52, 62.15, 64.58, 57.74], "price": [1774.93, 1822.43, 1770.31, 1793.35, 1876.13, 1860.58, 1723.17, 1726.37, 1901.47, 1972.03, 1928.92, 1985.6, 2075.82, 2343.1, 2495.35, 2654.92, 2896.14, 3296.1, 3457.59, 4177.08, 4822.19, 4415.73], "aL1": [19.47, 6.87, 10.1, 16.43, 25.77, 29.54], "aL0": [39.67, 31.69, 31.0, 39.15, 51.7, 57.9], "aAisc": [42.73, 31.92, 31.44, 38.15, 53.22, 61.19], "aPrice": [1790.0, 1795.0, 1948.0, 2397.0, 3501.0, 4612.0], "meanGaim": 16.6, "meanAisc": 40.9, "gap": 24.4, "residMean": 0.136, "residMax": 0.543}, {"id": "AEM", "name": "艾格尼可鹰", "en": "Agnico Eagle Mines Limited", "light": "#1baf7a", "dark": "#199e70", "cik": "0000002809", "exchange": "NYSE / TSX: AEM（外国私募发行人，IFRS，美元）", "forms": "6-K 两份 EX-99.1（其一为管理层讨论 + 中期财务报表，其二为新闻稿）· 40-F（年报，含 EX-99.2 审计报表、EX-99.3 年度管理层讨论）", "revenueSrc": "Note 14（2026）/ Note 16（2021）<b>REVENUES FROM MINING OPERATIONS</b> 按金属拆分表的 <b>Gold</b> 行。原始单位为千美元，已换算为百万美元。", "opcostSrc": "利润表 <b>Production costs</b>（2026，COST OF SALES 块内）/ <b>Production</b>（2021，附注声明不含摊销）", "aiscNote": "同时公布副产品与「共同产品」两套，但其<b>「共同产品」同样只是把抵扣加回去</b>，成本一分未分摊给副产品、分母仍是纯黄金盎司。真正的收入加权共同产品由我们自行计算：2026Q2 为 1,511 美元/盎司，公司公布的「共同产品」1,534 高估黄金 23.6 美元/盎司。", "quirks": ["AISC 分母是<b>产出</b>盎司而非销售盎司，全行打 <code>AISC_PER_PRODUCED</code>。22 个季度产出与销售差距均值 +0.91%、区间 −4.89%~+3.53%，<b>有符号且均值回归</b>，不能用单一系数换算。其中约六成是三个矿山实物权利金造成的定义性楔子（Canadian Malartic 5%、Detour Lake 2%、Macassa 1.5%）。", "2021 年 AISC 的分母科目叫 <b>Adjusted gold production</b>（剔除试生产盎司），2022 年起改叫 <b>Gold production</b>。逐年读表头，不假设。", "三次追溯重述：IAS 16 试生产收入（2021 全年收入 +1.90%）、Kirkland Lake 购买价格分摊、Yamana / Canadian Malartic 购买价格分摊。一律采用<b>最新版本</b>。", "2022Q1 为 <b>52 天存根季度</b>（Kirkland Lake 于 2月8日并表），打 <code>STUB_QUARTER</code>，不做平滑掩盖。", "同一份文件里「Total Capital Expenditures」有<b>三个不同数字</b>：现金流量表 809.3、管理层讨论 800.9（含资本化勘探）、新闻稿 699.2（不含）——相差 14%。按方法论取现金流量表口径。", "复垦摊提被<b>捆在 Finance costs 里</b>，无法单列，故记 null 而非 0，避免与净利息重复计算。"], "l1": [12.43, 17.54, 13.27, 7.7, 6.92, 17.46, 11.01, 5.55, 17.49, 18.5, 14.51, 16.83, 20.41, 29.52, 29.37, 29.77, 23.35, 44.78, 38.44, 39.07, 14.53, 33.7], "l2": [12.43, 14.99, 14.42, 12.74, 11.57, 12.55, 12.37, 11.46, 12.31, 12.31, 12.51, 14.04, 15.96, 16.46, 19.52, 22.02, 23.0, 24.88, 28.48, 31.59, 31.59, 32.28], "l0": [35.39, 36.04, 32.5, 28.92, 29.5, 40.55, 34.33, 30.13, 35.64, 33.36, 27.28, 33.22, 36.95, 43.72, 44.83, 48.14, 51.35, 58.06, 57.9, 60.85, 65.87, 63.2], "aisc": [44.39, 43.83, 40.95, 38.67, 45.22, 43.56, 36.93, 27.81, 38.51, 40.76, 36.61, 36.08, 42.22, 48.77, 47.81, 49.32, 57.83, 60.1, 60.52, 64.58, 69.64, 66.63], "price": [1794.63, 1827.84, 1797.97, 1809.45, 1877.8, 1864.93, 1725.09, 1728.05, 1888.31, 1973.58, 1925.33, 1982.41, 2058.46, 2338.26, 2485.95, 2653.57, 2888.11, 3283.42, 3470.86, 4140.86, 4858.22, 4478.1], "aL1": [12.78, 10.53, 16.84, 27.53, 37.0, 23.76], "aL0": [33.22, 33.92, 32.33, 43.7, 57.45, 64.58], "aAisc": [41.96, 38.47, 37.98, 47.22, 61.07, 68.19], "aPrice": [1807.0, 1797.0, 1944.0, 2379.0, 3446.0, 4667.0], "meanGaim": 21.0, "meanAisc": 47.3, "gap": 26.3, "residMean": 0.22, "residMax": 1.3}, {"id": "KGC", "name": "金罗斯", "en": "Kinross Gold Corporation", "light": "#eda100", "dark": "#c98500", "cik": "0000701818", "exchange": "NYSE: KGC / TSX: K（外国私募发行人，IFRS，美元）", "forms": "6-K 附件 EX-99.x（新闻稿 + 管理层讨论 + 中期财务报表）· 40-F（年报）", "revenueSrc": "利润表 <b>Metal sales</b> 减去管理层讨论第11节的 <b>silver revenue</b>——两个已披露行相减，绝非「价格×盎司」倒推。验证：所得除以黄金销售盎司，与公司公布的平均实现金价在 22 个季度内偏差均 ≤0.036%。", "opcostSrc": "利润表 <b>Production cost of sales</b>", "aiscNote": "头条为<b>黄金当量（GEO）</b>口径，公司自己称之为 co-product accounting——这在代数上成立：按现货比价把白银折入分母，等价于按相对收入分摊联合成本（验证：486,507 + 771,000÷61.61 = 499,021 ≈ 公布的 499,035）。<b>因此金罗斯与纽蒙特是本组仅有的两家真正披露共同产品重述的公司。</b>但换算比价四个季度内从 97.41:1 摆到 57.79:1，波动 68%。", "quirks": ["<b>无 IFRS 15 按金属拆分附注</b>，利润表只有一行 Metal sales，分部附注只按矿山拆。金/银拆分只存在于管理层讨论的非GAAP对账里，且专门的 <b>Attributable gold revenue</b> 表 2024Q4 才出现。", "<code>gold_oz_produced</code> 列装的是 <b>GEO</b>——金罗斯全文未披露纯黄金产量。全行打 <code>GEO_BASIS</code>。", "2022Q1–2023Q3 为<b>终止经营列报</b>：俄罗斯资产于 2022Q1 移出持续经营，Chirano 在 2022Q1 报表里<b>仍在</b>持续经营、2022Q2 才移出——<b>2022Q1 被重述了两次</b>（Metal sales 768.0 → 700.9）。2021 全年从 3,729.4 重述为 2,599.6。", "Finance expense 是毛捆绑，但金罗斯<b>把它拆开了</b>，所以净利息取利息行、复垦摊提单独取，既穷尽又不重叠。", "白银占金属销售 0.59%–5.91%（均值 2.84%），远低于外部资料常引用的约 8%。", "无单独的勘探科目——利润表行为 <b>Exploration and business development</b>，且其定义在 2022Q2–2024Q4 间漂移过。取整行并标注，宁可口径略宽也不要口径不一致。"], "l1": [14.33, 18.85, 8.98, -7.36, 11.01, 11.48, 7.22, 7.33, 3.4, 14.79, 14.37, 9.34, 12.07, 19.0, 32.4, 28.79, 29.78, 35.76, 41.82, 40.83, 36.54, 32.79], "l2": [14.33, 16.59, 14.05, 8.7, 9.16, 9.55, 10.6, 10.06, 8.24, 8.24, 9.14, 10.12, 10.3, 10.85, 12.82, 16.4, 19.8, 22.74, 26.3, 31.1, 34.02, 34.68], "l0": [34.72, 29.55, 24.28, 27.04, 22.54, 22.3, 21.91, 23.26, 20.43, 29.05, 25.29, 23.16, 24.83, 29.67, 39.0, 37.56, 43.38, 51.27, 50.05, 54.64, 58.9, 56.43], "aisc": [46.68, 42.22, 32.69, 27.69, 33.83, 28.68, 26.75, 30.48, 32.2, 36.12, 34.49, 32.71, 38.11, 42.05, 46.22, 44.05, 53.41, 55.27, 54.1, 57.02, 66.0, 60.94], "price": [1787.22, 1813.93, 1790.33, 1796.35, 1875.44, 1871.75, 1732.41, 1730.46, 1893.89, 1975.58, 1929.44, 1973.59, 2069.88, 2341.61, 2476.88, 2663.15, 2857.04, 3284.42, 3459.59, 4143.55, 4872.82, 4483.18], "aL1": [9.2, 9.05, 10.76, 24.0, 37.49, 34.74], "aL0": [29.12, 22.54, 24.64, 33.47, 50.25, 57.71], "aAisc": [37.78, 29.89, 33.94, 42.96, 55.08, 63.56], "aPrice": [1797.0, 1794.0, 1945.0, 2393.0, 3423.0, 4677.0], "meanGaim": 19.3, "meanAisc": 41.9, "gap": 22.6, "residMean": 0.021, "residMax": 0.036}], "partialYear": 2026, "meanGap": 24.0, "meanAisc": 43.5, "meanGaim": 19.4, "n": 88, "nCo": 4};
+const Q = D.quarters, Y = D.years, S = D.series;
+const NS = 'http://www.w3.org/2000/svg';
+const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
 
 document.getElementById('meta').textContent =
-  D.nCo + ' companies · ' + Q.length + ' quarters · ' + D.n +
-  ' company-quarters, every one reconciled to its published AISC within 2%';
+  `${D.nCo} 家公司 · ${Q.length} 个季度 · ${D.n} 个公司季度观测，每一个均已对其公布的 AISC 完成 2% 以内的反算校验`;
+document.getElementById('partialNote').textContent =
+  `${D.partialYear} 年仅含上半年两个季度，图中以虚线标出，不可与整年直接比较。`;
 
-const hero = [
-  ['Mean AISC margin', (S.reduce((a,s)=>a+s.mean_aisc,0)/S.length).toFixed(1)+'%'],
-  ['Mean all-in margin', (S.reduce((a,s)=>a+s.mean_gaim,0)/S.length).toFixed(1)+'%'],
-  ['What AISC omits', D.meanGap.toFixed(1)+' pts'],
-];
-document.getElementById('hero').innerHTML = hero.map(([k,v])=>
-  `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+document.getElementById('hero').innerHTML = [
+  ['AISC 利润率均值', D.meanAisc + '%'],
+  ['全成本利润率均值', D.meanGaim + '%'],
+  ['AISC 未计入的成本', D.meanGap + ' 个百分点'],
+].map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 
-document.getElementById('leg').innerHTML = S.map(s=>
-  `<span><i class="sw" style="background:var(--s-${s.id})"></i>${s.name}</span>`).join('');
+document.getElementById('leg').innerHTML = S.map(s =>
+  `<span><i class="sw" style="background:var(--s-${s.id})"></i>${s.name} <span style="color:var(--ink-3)">${s.en.split(' ')[0]}</span></span>`).join('');
 
-const NS='http://www.w3.org/2000/svg';
-const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
-
-function draw(svg, opts){
-  const {w,h,m,ymin,ymax,lines,bands,ticks,fs=11,xevery=4} = opts;
-  const labels=[];
-  const px = i => m.l + i*(w-m.l-m.r)/(Q.length-1);
-  const py = v => m.t + (ymax-v)*(h-m.t-m.b)/(ymax-ymin);
-  for(let g=ymin; g<=ymax; g+=ticks){
-    svg.appendChild(el('line',{x1:m.l,x2:w-m.r,y1:py(g),y2:py(g),class:g===0?'zero':'grid'}));
-    const t=el('text',{x:m.l-7,y:py(g)+3.5,class:'ax','text-anchor':'end'});
-    t.textContent=g+'%'; t.setAttribute('font-size',fs); svg.appendChild(t);
+function draw(svg, o) {
+  const { w, h, m, ymin, ymax, ticks, lines, bands, cats, fs = 11, xevery = 4 } = o;
+  const labels = [];
+  const px = i => m.l + i * (w - m.l - m.r) / (cats.length - 1);
+  const py = v => m.t + (ymax - v) * (h - m.t - m.b) / (ymax - ymin);
+  for (let g = ymin; g <= ymax; g += ticks) {
+    svg.appendChild(el('line', { x1: m.l, x2: w - m.r, y1: py(g), y2: py(g), class: g === 0 ? 'zero' : 'grid' }));
+    const t = el('text', { x: m.l - 7, y: py(g) + 3.5, class: 'ax', 'text-anchor': 'end', 'font-size': fs });
+    t.textContent = g + '%'; svg.appendChild(t);
   }
-  Q.forEach((q,i)=>{ if(i%xevery) return;
-    const t=el('text',{x:px(i),y:h-m.b+16,class:'ax','text-anchor':'middle'});
-    t.textContent=q.replace('Q',' Q'); t.setAttribute('font-size',fs); svg.appendChild(t);
+  cats.forEach((c, i) => {
+    if (i % xevery) return;
+    const t = el('text', { x: px(i), y: h - m.b + 16, class: 'ax', 'text-anchor': 'middle', 'font-size': fs });
+    t.textContent = String(c).replace('Q', ' Q'); svg.appendChild(t);
   });
-  (bands||[]).forEach(b=>{
-    let d='';
-    b.hi.forEach((v,i)=>{ if(v!=null) d+=(d?'L':'M')+px(i)+' '+py(v); });
-    for(let i=b.lo.length-1;i>=0;i--) if(b.lo[i]!=null) d+='L'+px(i)+' '+py(b.lo[i]);
-    svg.appendChild(el('path',{d:d+'Z',fill:'var(--band)','fill-opacity':.34}));
+  (bands || []).forEach(b => {
+    let d = '';
+    b.hi.forEach((v, i) => { if (v != null) d += (d ? 'L' : 'M') + px(i) + ' ' + py(v); });
+    for (let i = b.lo.length - 1; i >= 0; i--) if (b.lo[i] != null) d += 'L' + px(i) + ' ' + py(b.lo[i]);
+    svg.appendChild(el('path', { d: d + 'Z', fill: 'var(--band)', 'fill-opacity': .34 }));
   });
-  lines.forEach(L=>{
-    let d='';
-    L.v.forEach((v,i)=>{ d += v==null?'':(d?'L':'M')+px(i)+' '+py(v); });
-    svg.appendChild(el('path',{d,fill:'none',stroke:L.c,'stroke-width':L.sw||2,
-      'stroke-opacity':L.op||1,'stroke-linejoin':'round','stroke-linecap':'round',
-      ...(L.dash?{'stroke-dasharray':L.dash}:{})}));
-    if(L.label){
-      const last=L.v.length-1;
-      labels.push({x:px(last)+6,y:py(L.v[last]),text:L.label,c:L.c});
-    }
+  lines.forEach(L => {
+    const seg = L.solidTo == null ? [[L.v, null]] : [
+      [L.v.map((v, i) => i <= L.solidTo ? v : null), null],
+      [L.v.map((v, i) => i >= L.solidTo ? v : null), '5 4'],
+    ];
+    seg.forEach(([vals, dash]) => {
+      let d = '';
+      vals.forEach((v, i) => { d += v == null ? '' : (d ? 'L' : 'M') + px(i) + ' ' + py(v); });
+      if (!d) return;
+      svg.appendChild(el('path', {
+        d, fill: 'none', stroke: L.c, 'stroke-width': L.sw || 2, 'stroke-opacity': L.op || 1,
+        'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+        ...(dash || L.dash ? { 'stroke-dasharray': dash || L.dash } : {}),
+      }));
+    });
+    if (L.dot) L.v.forEach((v, i) => { if (v != null) svg.appendChild(el('circle', { cx: px(i), cy: py(v), r: 3.2, fill: L.c })); });
+    if (L.label) { const k = L.v.length - 1; labels.push({ x: px(k) + 6, y: py(L.v[k]), text: L.label, c: L.c }); }
   });
-  // nudge overlapping end-labels apart so identity stays readable
-  labels.sort((a,b)=>a.y-b.y);
-  const MIN=13;
-  for(let i=1;i<labels.length;i++)
-    if(labels[i].y-labels[i-1].y<MIN) labels[i].y=labels[i-1].y+MIN;
-  labels.forEach(L=>{
-    const t=el('text',{x:L.x,y:L.y+4,class:'lbl',fill:L.c});
-    t.textContent=L.text; svg.appendChild(t);
-  });
-  return {px,py};
+  labels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 13) labels[i].y = labels[i - 1].y + 13;
+  labels.forEach(L => { const t = el('text', { x: L.x, y: L.y + 4, class: 'lbl', fill: L.c }); t.textContent = L.text; svg.appendChild(t); });
+  return { px, py };
 }
 
-// main chart
-const main=document.getElementById('main');
-const M={l:44,r:82,t:14,b:30};
-const geo=draw(main,{w:1020,h:380,m:M,ymin:-10,ymax:60,ticks:10,lines:[
-  ...S.map(s=>({v:s.l1,c:`var(--s-${s.id})`,sw:1.25,op:.42})),
-  ...S.map(s=>({v:s.l2,c:`var(--s-${s.id})`,sw:2.5,label:s.name})),
-]});
-
-// hover
-const tip=document.getElementById('tip');
-const hair=el('line',{class:'grid','stroke-width':1.5,y1:M.t,y2:380-M.b,opacity:0});
-main.appendChild(hair);
-main.addEventListener('pointermove',e=>{
-  const r=main.getBoundingClientRect();
-  const x=(e.clientX-r.left)*(1020/r.width);
-  let i=Math.round((x-M.l)/((1020-M.l-M.r)/(Q.length-1)));
-  i=Math.max(0,Math.min(Q.length-1,i));
-  hair.setAttribute('x1',geo.px(i)); hair.setAttribute('x2',geo.px(i)); hair.setAttribute('opacity',1);
-  tip.style.opacity=1;
-  tip.style.left=Math.min(e.clientX+16,innerWidth-260)+'px';
-  tip.style.top=(e.clientY-12)+'px';
-  tip.innerHTML=`<b>${Q[i]} · gold ≈ $${S[0].price[i]??'—'}/oz</b>`+S.map(s=>
-    `<div class="r"><span style="color:var(--s-${s.id})">${s.name}</span><span>${
-      s.l1[i]==null?'—':s.l1[i].toFixed(1)+'%'}</span></div>`).join('');
+// quarterly
+const MQ = { l: 44, r: 74, t: 14, b: 30 };
+const geo = draw(document.getElementById('mainQ'), {
+  w: 1020, h: 380, m: MQ, ymin: -10, ymax: 60, ticks: 10, cats: Q,
+  lines: [...S.map(s => ({ v: s.l1, c: `var(--s-${s.id})`, sw: 1.25, op: .42 })),
+          ...S.map(s => ({ v: s.l2, c: `var(--s-${s.id})`, sw: 2.5, label: s.name }))],
 });
-main.addEventListener('pointerleave',()=>{tip.style.opacity=0;hair.setAttribute('opacity',0);});
+
+// annual — last point is a partial year, drawn dashed
+draw(document.getElementById('mainA'), {
+  w: 1020, h: 330, m: { l: 44, r: 74, t: 14, b: 30 }, ymin: 0, ymax: 45, ticks: 10,
+  cats: Y, xevery: 1,
+  lines: S.map(s => ({ v: s.aL1, c: `var(--s-${s.id})`, sw: 2.5, label: s.name, dot: true, solidTo: Y.length - 2 })),
+});
+
+// hover on the quarterly chart
+const tip = document.getElementById('tip');
+const mainQ = document.getElementById('mainQ');
+const hair = el('line', { class: 'grid', 'stroke-width': 1.5, y1: MQ.t, y2: 380 - MQ.b, opacity: 0 });
+mainQ.appendChild(hair);
+mainQ.addEventListener('pointermove', e => {
+  const r = mainQ.getBoundingClientRect();
+  let i = Math.round(((e.clientX - r.left) * (1020 / r.width) - MQ.l) / ((1020 - MQ.l - MQ.r) / (Q.length - 1)));
+  i = Math.max(0, Math.min(Q.length - 1, i));
+  hair.setAttribute('x1', geo.px(i)); hair.setAttribute('x2', geo.px(i)); hair.setAttribute('opacity', 1);
+  tip.style.opacity = 1;
+  tip.style.left = Math.min(e.clientX + 16, innerWidth - 240) + 'px';
+  tip.style.top = (e.clientY - 12) + 'px';
+  tip.innerHTML = `<b>${Q[i]} · 实现金价约 $${S[0].price[i] ?? '—'}/oz</b>` + S.map(s =>
+    `<div class="r"><span style="color:var(--s-${s.id})">${s.name}</span><span>${s.l1[i] == null ? '—' : s.l1[i].toFixed(1) + '%'}</span></div>`).join('');
+});
+mainQ.addEventListener('pointerleave', () => { tip.style.opacity = 0; hair.setAttribute('opacity', 0); });
 
 // small multiples
-document.getElementById('sm').innerHTML=S.map(s=>
-  `<div class="sm"><h3>${s.name}</h3><p>AISC ${s.mean_aisc}% → all-in ${s.mean_gaim}% · omits ${s.gap} pts</p>
-   <svg id="s-${s.id}" width="260" height="150"></svg></div>`).join('');
-S.forEach(s=>draw(document.getElementById('s-'+s.id),{
-  w:260,h:150,m:{l:32,r:8,t:8,b:24},ymin:-10,ymax:80,ticks:20,fs:9,xevery:8,
-  bands:[{hi:s.aisc,lo:s.l1}],
-  lines:[{v:s.aisc,c:'var(--ink-3)',sw:1.5,dash:'4 3'},{v:s.l1,c:`var(--s-${s.id})`,sw:2}],
+document.getElementById('sm').innerHTML = S.map(s =>
+  `<div class="sm"><h4>${s.name} <span style="color:var(--ink-3);font-weight:400;font-size:12px">${s.en.split(' ')[0]}</span></h4>
+   <p>AISC ${s.meanAisc}% → 全成本 ${s.meanGaim}% · 漏计 ${s.gap} 个百分点</p>
+   <svg id="s-${s.id}" width="264" height="152"></svg></div>`).join('');
+S.forEach(s => draw(document.getElementById('s-' + s.id), {
+  w: 264, h: 152, m: { l: 34, r: 8, t: 8, b: 24 }, ymin: -10, ymax: 80, ticks: 20, fs: 9,
+  cats: Q, xevery: 8, bands: [{ hi: s.aisc, lo: s.l1 }],
+  lines: [{ v: s.aisc, c: 'var(--ink-3)', sw: 1.5, dash: '4 3' }, { v: s.l1, c: `var(--s-${s.id})`, sw: 2 }],
 }));
 
-// table
-document.getElementById('tbl').innerHTML =
-  '<thead><tr><th>Quarter</th><th>Gold $/oz</th>'+
-  S.map(s=>`<th>${s.name} AISC</th><th>${s.name} all-in</th>`).join('')+'</tr></thead><tbody>'+
-  Q.map((q,i)=>`<tr><td>${q}</td><td>${S[0].price[i]??'—'}</td>`+
-    S.map(s=>`<td>${s.aisc[i]==null?'—':s.aisc[i].toFixed(1)+'%'}</td><td>${
-      s.l1[i]==null?'—':s.l1[i].toFixed(1)+'%'}</td>`).join('')+'</tr>').join('')+'</tbody>';
+// GAIM vs AISC comparison
+const CMP = [
+  ['成长性 / 扩张资本开支', '按定义只含维持性资本开支', '<span class="yes">全额计入</span>', '是。现金实实在在流出，唯一的疑问是回报与时点，不是它存不存在。这是最大的一笔，也是最大的操纵空间——把项目从维持性重分类为非维持性，现金支出一分未变，AISC 却下降。'],
+  ['绿地 / 非维持性勘探', '仅含维持性勘探', '<span class="yes">全额计入</span>', '是。储量替代是这个行业变相的销货成本。一家停止勘探的公司 AISC 会下降，同时在清算自己的资产基础。'],
+  ['所得税（已付现金）', '<span class="no">明文排除</span>（权利金与生产税则计入）', '<span class="yes">按已付现金税计入</span>', '是，且是对毛利的第一顺位索取权。用现金流量表的实付数而非利润表的税项费用，以避开递延税噪声。'],
+  ['净利息与融资成本', '<span class="no">明文排除</span>（2019 年起租赁部分除外）', '<span class="yes">计入，含符号</span>', '是。WGC 的理由是利息反映资本结构而非经营效率——这对<b>成本</b>指标成立，对<b>股东利润率</b>指标不成立。净现金公司此项为负，不做钳制。'],
+  ['并购顾问费 / 分手费 / 整合费', '<span class="no">排除，连 AIC 也排除</span>', '<span class="yes">计入</span>', '是。而且被收购储量的<b>收购对价本身</b>在任何 WGC 指标里都不出现——靠买而非靠找来补充储量的公司，AISC 看起来很干净。'],
+  ['诉讼费用与和解金', '<span class="no">2018 年修订新增的排除项</span>', '<span class="yes">计入</span>', '是。一笔真实的现金支出被标准背书除名了。'],
+  ['重大遣散费', '<span class="no">以「一次性」为由排除</span>', '<span class="yes">计入</span>', '是。「一次性」在一个完整周期里反复出现，就是经营成本。'],
+  ['少数股东权益渗漏', '基础选择问题，可合并可归属', '<span class="yes">强制归属口径</span>', '是。持股 61.5% 的矿山产生的现金，并非 100% 归母公司股东所有。这不是成本项而是口径问题，却同样吞噬股东回报。'],
+  ['营运资金变动', '<span class="no">明文排除</span>（存货销售基础调整除外）', '<span class="no">头条不计入</span>', '是，但只是时点问题，跨周期均值回归。计入会给序列注入巨大的季节性锯齿，那不是经营表现。仅在自由现金流交叉验证里体现。'],
+  ['资产减值与冲销', '<span class="no">以「使盈利正常化」为由排除</span>', '<span class="no">刻意不加回</span>', '含糊。减值本身不涉及现金且是向后看的，但<b>当初形成该资产的现金支出是真实的</b>——而那笔支出已经通过「成长性资本开支」全额计入。再加一次就是重复计算。减值改作验证性诊断：持续出现的减值恰恰证明我们对资本开支的计提是对的。'],
+  ['股权激励', '<b>本来就已计入</b>（2018版 FAQ 20 明确）', '维持计入，不重复', '是。需要警惕的是反方向：部分公司会公布剔除股权激励的「调整后 AISC」，那种数字不能用。'],
+  ['副产品抵扣', '把铜银收入冲抵黄金成本，使 AISC 成为<b>铜价的函数</b>', '<span class="yes">以收入占比重述为共同产品</span>', '副产品法下，报告出来的采金成本会因为铜价上涨而下降，与采矿效率无关，矿山层面甚至可为负值（纽蒙特 Peñasquito 2026Q1 为 −9,318 美元/盎司）。且金铜价格长期正相关，污染与分子系统性同向，任何「利润率对金价」的回归都会有偏。'],
+];
+document.getElementById('cmp').innerHTML =
+  '<thead><tr><th>项目</th><th>AISC 如何处理</th><th>GAIM 如何处理</th><th>是否股东真实承担？</th></tr></thead><tbody>' +
+  CMP.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('') + '</tbody>';
+
+// formula
+document.getElementById('formula').textContent =
+`         黄金板块收入 R_Au          ← 分部附注 / 按金属拆分的收入附注，直接读取
+       − 经营成本（不含折旧摊销）
+       − 权利金与生产税
+       − 公司管理费 × w_Au          ← w_Au = 黄金收入 ÷ 总收入
+       − 勘探费用（仅费用化）× w_Au  ← 资本化勘探已在资本开支内，不可重复扣
+       − 资本开支总额 × w_Au        ← 现金流量表，维持性与成长性合计，不拆分
+       − 复垦摊提 × w_Au            ← 若已捆在财务费用内则记 null，不重复取
+       − 租赁付款 × w_Au
+       − 净利息 × w_Au              ← 有符号，净现金公司为负
+       − 已付现金税 × w_Au          ← 现金流量表实付数，非利润表税项费用
+GAIM = ─────────────────────────────────────────────────
+                  黄金板块收入 R_Au
+
+校验和（不是输入）：
+  重构 AISC = [经营成本 + 权利金 + 公司管理费 + 维持性勘探 + 维持性资本开支
+              + 复垦 + 维持性租赁 − 副产品抵扣] ÷ 销售盎司
+  与公司公布的 AISC 对账，残差 > 2% 即判定财报被读错，该观测作废。
+  若公司未公布 AIC，则以 AISC 对账即可——两者都只是校验和。
+
+三层阶梯：
+  L0a  纯财报利润率 =（分部收入 − 分部成本 − 分部折旧摊销）÷ 分部收入   零调整
+  L1   GAIM 原始序列，全成本加载，保留全部一次性冲击
+  L2   L1 经 8 季度滚动窗口、双侧 15% 截尾后的平滑序列`;
+
+// appendix
+document.getElementById('appendix').innerHTML = S.map(s => `
+  <details><summary><span class="tag">${s.en}</span>${s.name}</summary>
+    <div class="body">
+      <dl class="kv">
+        <dt>上市与申报</dt><dd>${s.exchange}</dd>
+        <dt>SEC CIK</dt><dd class="mono">${s.cik}</dd>
+        <dt>申报表种</dt><dd>${s.forms}</dd>
+        <dt>申报索引</dt><dd><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${s.cik}&type=&dateb=&owner=include&count=100" target="_blank" rel="noopener">EDGAR 全部申报</a> · <a href="https://data.sec.gov/submissions/CIK${s.cik}.json" target="_blank" rel="noopener">submissions JSON</a></dd>
+        <dt>反算残差</dt><dd>均值 ${s.residMean}% · 最大 ${s.residMax}%（门槛 2%）</dd>
+        <dt>期间均值</dt><dd>AISC 利润率 ${s.meanAisc}% → 全成本利润率 ${s.meanGaim}%，漏计 ${s.gap} 个百分点</dd>
+      </dl>
+      <p><b>黄金收入取自：</b>${s.revenueSrc}</p>
+      <p><b>经营成本取自：</b>${s.opcostSrc}</p>
+      <p><b>AISC 口径：</b>${s.aiscNote}</p>
+      <p><b>抽取过程中的陷阱：</b></p>
+      <ul>${s.quirks.map(x => `<li>${x}</li>`).join('')}</ul>
+    </div>
+  </details>`).join('');
+
+// CSV export
+const csvQ = () => ['ticker,quarter,realised_price_usd_per_oz,L0a_pct,aisc_margin_pct,GAIM_raw_pct,GAIM_trimmed_pct']
+  .concat(S.flatMap(s => Q.map((q, i) =>
+    [s.id, q, s.price[i] ?? '', s.l0[i] ?? '', s.aisc[i] ?? '', s.l1[i] ?? '', s.l2[i] ?? ''].join(',')))).join('\n');
+const csvA = () => ['ticker,year,realised_price_usd_per_oz,L0a_pct,aisc_margin_pct,GAIM_pct,note']
+  .concat(S.flatMap(s => Y.map((y, i) =>
+    [s.id, y, s.aPrice[i] ?? '', s.aL0[i] ?? '', s.aAisc[i] ?? '', s.aL1[i] ?? '',
+     y === D.partialYear ? 'partial_year_H1_only' : ''].join(',')))).join('\n');
+
+const ta = document.getElementById('csv'), msg = document.getElementById('copied');
+ta.value = csvQ();
+function put(text, label) {
+  ta.value = text; ta.select();
+  navigator.clipboard?.writeText(text)
+    .then(() => { msg.textContent = `已复制${label}到剪贴板`; })
+    .catch(() => { msg.textContent = `无法访问剪贴板，请在下方文本框中全选复制`; });
+  setTimeout(() => msg.textContent = '', 4000);
+}
+document.getElementById('copyQ').onclick = () => put(csvQ(), '季度数据');
+document.getElementById('copyA').onclick = () => put(csvA(), '年度数据');
 </script>

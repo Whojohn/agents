@@ -3,7 +3,10 @@
 
 L0a  as-reported gold-segment operating margin   (zero adjustment)
 L1   GAIM, fully-loaded forward-computed margin  (no outlier treatment)
-L2   L1 after a two-sided 15% trim               (median-biased smoothing)
+L2   L1 after a two-sided trim over a rolling window (median-biased smoothing).
+     NOTE the arithmetic: floor(0.15 * 8) = 1 observation is dropped from EACH
+     tail of an 8-quarter window, i.e. 12.5% per tail and 25% of the window in
+     total. Calling it "a 15% trim" overstates how gentle it is.
 
 Plus the AISC margin, carried as the industry-standard cross-check. The
 L1-vs-AISC gap is the product: it quantifies what AISC leaves out.
@@ -90,7 +93,24 @@ def load_company(path):
     d["L0a"] = (rev - site_cost - d.segment_dda.fillna(0)) / rev * 100
     d["L1"] = (rev - site_cost - group_cost) / rev * 100
     d["realised_price"] = d[price_col] / d.gold_oz_sold * 1e6
-    d["aisc_margin"] = (1 - d.published_aisc / d.realised_price) * 100
+
+    # Put every company's AISC on ONE basis before comparing: by-product, per gold
+    # ounce SOLD. Companies publish four different conventions -- Newmont headlines
+    # co-product, Kinross headlines gold-equivalent, Agnico denominates per ounce
+    # PRODUCED -- and comparing them unconverted makes a presentation choice look
+    # like an economic difference.
+    aisc = d.published_aisc.copy()
+    basis = "as published (by-product, per oz sold)"
+    if "published_aisc_byproduct" in d and d.published_aisc_byproduct.notna().any():
+        aisc = d.published_aisc_byproduct           # Newmont (co-product headline), Kinross (GEO headline)
+        basis = "by-product column substituted for the published headline"
+    if "aisc_denominator_oz" in d and d.aisc_denominator_oz.notna().any() \
+            and str(d.aisc_basis.iloc[0]).lower().startswith("by-product"):
+        # Agnico: restate per-ounce-produced onto an ounces-sold denominator
+        aisc = aisc * d.aisc_denominator_oz / d.gold_oz_sold
+        basis = "restated from per-ounce-produced to per-ounce-sold"
+    d["aisc_comparable"], d["aisc_basis_note"] = aisc, basis
+    d["aisc_margin"] = (1 - aisc / d.realised_price) * 100
     d["gold_revenue"] = rev
     return d
 
@@ -114,6 +134,37 @@ def add_trimmed(d):
     return d, dropped_log
 
 
+def build_annual(frames):
+    """Annual series: sum the dollar line items first, then form the ratio.
+
+    Averaging four quarterly ratios would weight a small quarter equally with a
+    large one. Summing the components and dividing once is the only correct way.
+    """
+    rows = []
+    for d in frames:
+        gaim_col, price_col = REVENUE_BASIS.get(d.ticker.iloc[0], DEFAULT_BASIS)
+        for year, g in d.groupby("year"):
+            rev, price_rev = g[gaim_col].sum(), g[price_col].sum()
+            oz = g.gold_oz_sold.sum()
+            royalties = g.royalties.fillna(0).sum() if "royalties" in g else 0
+            site = g.opcost_ex_dda.fillna(0).sum() + royalties
+            w = min(rev / g.total_revenue.sum(), 1.0)
+            group_cost = g.reindex(columns=GROUP_COSTS).fillna(0).sum().sum() * w
+            # ounce-weighted AISC: total AISC dollars over total ounces
+            aisc_usd = (g.aisc_comparable * g.gold_oz_sold).sum() / 1e6
+            rows.append({
+                "ticker": d.ticker.iloc[0], "year": year, "quarters": len(g),
+                "complete": len(g) == 4,
+                "gold_revenue": round(rev, 1), "gold_oz_sold": int(oz),
+                "realised_price": round(price_rev / oz * 1e6, 0),
+                "L0a": round((rev - site - g.segment_dda.fillna(0).sum()) / rev * 100, 2),
+                "L1": round((rev - site - group_cost) / rev * 100, 2),
+                "aisc_margin": round((1 - aisc_usd / price_rev) * 100, 2),
+                "aisc_weighted": round(aisc_usd * 1e6 / oz, 0),
+            })
+    return pd.DataFrame(rows)
+
+
 def main():
     FINAL.mkdir(parents=True, exist_ok=True)
     files = sorted(INTERIM.glob("*_quarterly.csv"))
@@ -128,12 +179,15 @@ def main():
 
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
             "w_gold", "L0a", "aisc_margin", "L1", "L2", "published_aisc",
-            "recon_residual_pct", "flags"]
+            "aisc_comparable", "aisc_basis_note", "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
     out.to_csv(FINAL / "margins.csv", index=False)
+    annual = build_annual(frames)
+    annual.to_csv(FINAL / "margins_annual.csv", index=False)
     pd.DataFrame(trims).to_csv(FINAL / "trimmed_observations.csv", index=False)
 
-    print(f"companies: {sorted(out.ticker.unique())}   rows: {len(out)}")
+    print(f"companies: {sorted(out.ticker.unique())}   quarterly rows: {len(out)}   "
+          f"annual rows: {len(annual)} ({(~annual.complete).sum()} partial)")
     print(f"trimmed observations logged: {len(trims)}")
     for t, g in out.groupby("ticker"):
         print(f"  {t:5} L0a {g.L0a.mean():5.1f}%  AISC {g.aisc_margin.mean():5.1f}%  "
