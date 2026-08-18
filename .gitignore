@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Raw SEC filings — large binary/HTML corpus, refetchable via src/fetch_filings.py
+data/raw/*/
+!data/raw/.gitkeep
