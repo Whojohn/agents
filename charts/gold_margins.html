@@ -110,8 +110,9 @@
   <div class="hero" id="hero"></div>
 
   <h2><span class="n">季度</span>全成本利润率（GAIM）</h2>
-  <p class="note">自财报正向计算：黄金板块收入，扣除经营成本、权利金、按收入占比分摊的公司管理费、全部勘探费用、<b>资本开支总额</b>、复垦、租赁、净利息与已付现金税。细线为原始序列，粗线为双侧 15% 截尾后的平滑序列。</p>
+  <p class="note">自财报正向计算：黄金板块收入，扣除经营成本、权利金、按收入占比分摊的公司管理费、全部勘探费用、<b>资本开支总额</b>、复垦、租赁、净利息与已付现金税。默认显示截尾平滑后的序列。原始单季数据受现金税缴纳时点主导（公司间相关系数仅 0.38，滚动四季后回升至 0.84），不适合横向比较，因此收进开关里——但它随时可以调出来，平滑掉了什么必须可见。</p>
   <div class="legend" id="leg"></div>
+  <div class="exp"><button class="btn" id="toggleRaw">显示原始单季序列</button></div>
   <figure class="scroll"><svg id="mainQ" width="1020" height="380" role="img" aria-label="季度全成本利润率折线图"></svg></figure>
 
   <h2><span class="n">年度</span>全成本利润率（GAIM）</h2>
@@ -221,11 +222,24 @@ function draw(svg, o) {
 
 // quarterly
 const MQ = { l: 44, r: 74, t: 14, b: 30 };
-const geo = draw(document.getElementById('mainQ'), {
-  w: 1020, h: 380, m: MQ, ymin: -10, ymax: 60, ticks: 10, cats: Q,
-  lines: [...S.map(s => ({ v: s.l1, c: `var(--s-${s.id})`, sw: 1.25, op: .42 })),
-          ...S.map(s => ({ v: s.l2, c: `var(--s-${s.id})`, sw: 2.5, label: s.name }))],
-});
+const mainQ = document.getElementById('mainQ');
+let showRaw = false, geo;
+function renderMain() {
+  mainQ.replaceChildren();
+  geo = draw(mainQ, {
+    w: 1020, h: 380, m: MQ, ymin: -10, ymax: 60, ticks: 10, cats: Q,
+    lines: [...(showRaw ? S.map(s => ({ v: s.l1, c: `var(--s-${s.id})`, sw: 1.25, op: .38 })) : []),
+            ...S.map(s => ({ v: s.l2, c: `var(--s-${s.id})`, sw: 2.5, label: s.name }))],
+  });
+  mainQ.appendChild(hair);
+}
+const hair = el('line', { class: 'grid', 'stroke-width': 1.5, y1: MQ.t, y2: 380 - MQ.b, opacity: 0 });
+renderMain();
+document.getElementById('toggleRaw').onclick = e => {
+  showRaw = !showRaw;
+  e.target.textContent = showRaw ? '隐藏原始单季序列' : '显示原始单季序列';
+  renderMain();
+};
 
 // annual — last point is a partial year, drawn dashed
 draw(document.getElementById('mainA'), {
@@ -236,9 +250,6 @@ draw(document.getElementById('mainA'), {
 
 // hover on the quarterly chart
 const tip = document.getElementById('tip');
-const mainQ = document.getElementById('mainQ');
-const hair = el('line', { class: 'grid', 'stroke-width': 1.5, y1: MQ.t, y2: 380 - MQ.b, opacity: 0 });
-mainQ.appendChild(hair);
 mainQ.addEventListener('pointermove', e => {
   const r = mainQ.getBoundingClientRect();
   let i = Math.round(((e.clientX - r.left) * (1020 / r.width) - MQ.l) / ((1020 - MQ.l - MQ.r) / (Q.length - 1)));
