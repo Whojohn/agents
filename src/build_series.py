@@ -84,6 +84,22 @@ def load_company(path):
             d.loc[tgt, "cash_tax_paid"] += amount * share
             d.loc[src | tgt, "flags"] = d.loc[src | tgt, "flags"].fillna("") + ";TAX_REALLOCATED_TO_ACCRUAL_YEAR"
 
+    # Capitalised interest is handled differently by each filer, so the correction
+    # differs in sign. Newmont and Agnico already count it exactly once (their capex
+    # includes it and their interest line is already net of it) and are left alone.
+    #   Barrick  DOUBLE-COUNTS: capex includes capitalised interest AND net_interest
+    #            is the gross interest expense, before the capitalisation credit.
+    #   Kinross  OMITS it: it sits in a separate cash-flow investing line that feeds
+    #            neither column.
+    if "capitalised_interest" in d:
+        ci = d.capitalised_interest.fillna(0)
+        if ticker == "GOLD":
+            d["net_interest"] = d.net_interest - ci          # remove the double count
+            d["flags"] = d["flags"].fillna("") + ";CAPINT_DEDUPED"
+        elif ticker == "KGC":
+            d["capex_total"] = d.capex_total + ci            # fill the gap
+            d["flags"] = d["flags"].fillna("") + ";CAPINT_ADDED"
+
     gaim_col, price_col = REVENUE_BASIS.get(ticker, DEFAULT_BASIS)
     rev = d[gaim_col]
     royalties = d.royalties.fillna(0) if "royalties" in d else 0
