@@ -284,31 +284,47 @@ plus entity-level: `AU_REDOMICILE_2023` (AngloGold CIK 1067428→1973832), `BARR
 
 ## 11. Outlier treatment and smoothing (L2)
 
-**Method: two-sided 15% trimmed mean, median-biased.**
+**One exclusion rule, and it is economic rather than statistical.**
 
 ```
-for each company, rolling window w = 8 quarters:
-    sort the w values of L1
-    drop floor(0.15 * w) observations from EACH tail      # w=8 -> drop 1 each side
-    L2 = mean of the remaining central observations       # w=8 -> mean of middle 6
+A company-quarter is dropped from the aggregate when
+    published AISC / realised gold price  >  0.80
+i.e. when all-in sustaining cost consumes more than 80% of revenue.
+Survivors are aggregated revenue-weighted, then smoothed with a
+trailing 4-quarter average.
 ```
-Half-yearly reporters use w = 4 half-years (same span in calendar time); floor(0.15*4)=0,
-so no trim occurs and L2 = a 4-period moving average. This is disclosed rather than
-patched — a short series cannot support a trim, and pretending otherwise would be worse.
 
-Why a trim and not winsorization or event-rules:
-- A trim **discards** the extreme observations rather than capping them at a threshold,
-  so a single catastrophic quarter cannot drag the smoothed line at all.
-- It is **median-biased** — the estimator sits near the centre of the distribution, which is
-  what we want when the tails are genuine one-off shocks rather than information about the
-  underlying cost structure.
-- It is **purely statistical**, so it carries no analyst discretion about which events "count"
-  as one-offs. That discretion is precisely where a margin series gets quietly manipulated.
+The purpose is narrow and specific: stop one company's distressed year dragging the
+industry average down. A miner running at a 90% cost ratio is not telling you about
+the sector, it is telling you about itself.
 
-**Every trimmed observation is logged** to `data/final/trimmed_observations.csv` with company,
-quarter, L1 value, and the reason it fell outside the central band — so the reader can see
-exactly what was removed and disagree with it. Trimming that cannot be inspected is not a
-method, it is an assertion.
+**Why a flat threshold rather than a statistical trim.** An earlier version trimmed
+the extreme values inside a rolling window. That method cannot distinguish a
+company-specific one-off from a genuine sector-wide move, and in practice it deleted
+the latter — it discarded Barrick's real 2022 cost-shock trough from seven
+consecutive windows and lagged every turning point, because in a trending series the
+newest observation is almost always the window extreme. A fixed economic threshold
+has neither failure mode: the 2022 cost inflation hit all four companies at once, so
+it stays in as trend, exactly as it should.
+
+**Aggregate first, then smooth.** Because an industry-wide event appears in every
+company simultaneously, after aggregation it *is* the curve's own trend and survives.
+Only company-specific one-offs get diluted. This ordering is deliberate.
+
+**Revenue-weighted, never a mean of ratios.** Sum gold revenue and total cost across
+the selected companies and divide once. Averaging four margins would weight a $4bn
+company the same as a $1bn one and produce a number corresponding to no real entity.
+
+**Current bite: zero.** No observation in the 88-quarter pilot reaches the threshold;
+the worst is Newmont 2023Q2 at 77.9%. The rule is a guard for extending the series
+back through the 2013-2015 trough and for admitting high-cost South African miners.
+Every exclusion it ever makes is logged to `data/final/trimmed_observations.csv` with
+the AISC, the realised price and the ratio, so it can be checked by hand.
+
+**Timing artefacts are fixed at source, not smoothed over.** Agnico's Q1 2026 cash
+tax included $1.3bn the company itself attributes to the 2025 tax year; it is
+reallocated to 2025 pro-rata on gold revenue and flagged, rather than left as a
+44%-of-revenue lump for the smoother to hide.
 
 ## 12. Open items before production
 1. Confirm Barrick's "co-product" definition in the FY2024 40-F — suspected gross-of-credits.
