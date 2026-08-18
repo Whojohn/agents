@@ -3,10 +3,9 @@
 
 L0a  as-reported gold-segment operating margin   (zero adjustment)
 L1   GAIM, fully-loaded forward-computed margin  (no outlier treatment)
-L2   L1 after a two-sided trim over a rolling window (median-biased smoothing).
-     NOTE the arithmetic: floor(0.15 * 8) = 1 observation is dropped from EACH
-     tail of an 8-quarter window, i.e. 12.5% per tail and 25% of the window in
-     total. Calling it "a 15% trim" overstates how gentle it is.
+L2   L1 with distressed quarters dropped, then a trailing 4-quarter average.
+     A quarter is distressed when its AISC eats more than 80% of the realised
+     gold price -- see AISC_RATIO_CAP.
 
 Plus the AISC margin, carried as the industry-standard cross-check. The
 L1-vs-AISC gap is the product: it quantifies what AISC leaves out.
@@ -15,7 +14,6 @@ Reads whatever data/interim/<TICKER>_quarterly.csv files exist, so it can be
 re-run as more companies land. Writes data/final/margins.csv and
 data/final/trimmed_observations.csv.
 """
-import math
 import pathlib
 
 import pandas as pd
@@ -55,26 +53,14 @@ ANNUAL_CASH_TAX = {"NEM": {2021: 1534, 2022: 1122, 2023: 794}}
 # distortion at source instead. {ticker: [(paid_quarter, amount, accrual_year)]}
 TAX_REALLOCATION = {"AEM": [("2026Q1", 1300.0, 2025)]}
 
-TRIM_FRACTION = 0.15    # share of observations flagged as one-offs, by residual size
-MEDIAN_WINDOW = 5       # centred window the residual is measured against
-SMOOTH_WINDOW = 4       # trailing quarters averaged after exclusion
-
-
-def trimmed_mean(values, frac=TRIM_FRACTION):
-    """Two-sided trimmed mean: drop floor(n*frac) from each tail, average the rest.
-
-    Returns the trimmed mean and the values that were dropped, so every exclusion
-    stays inspectable. Trimming that cannot be audited is an assertion, not a method.
-    """
-    clean = [v for v in values if pd.notna(v)]
-    if not clean:
-        return float("nan"), []
-    k = math.floor(len(clean) * frac)
-    if k == 0:
-        return sum(clean) / len(clean), []
-    ordered = sorted(clean)
-    kept, dropped = ordered[k:len(ordered) - k], ordered[:k] + ordered[len(ordered) - k:]
-    return (sum(kept) / len(kept), dropped) if kept else (sum(clean) / len(clean), [])
+# A company-quarter is dropped from the aggregate when its AISC eats more than this
+# share of the realised gold price. The point is to stop one company's distressed
+# year dragging the industry average down -- a miner running at a 90% cost ratio is
+# not representative of the sector, it is in trouble. A flat economic threshold beats
+# a statistical trim here: it never discards a real industry-wide move, and anyone
+# can check whether a given quarter passes it.
+AISC_RATIO_CAP = 0.80
+SMOOTH_WINDOW = 4       # trailing quarters averaged
 
 
 def load_company(path):
@@ -136,29 +122,16 @@ def load_company(path):
 
 
 def add_trimmed(d):
-    """Flag one-offs by their residual from a rolling median, then smooth the rest.
-
-    The earlier version trimmed the extreme LEVELS inside each rolling window. In a
-    trending series the newest observation is almost always the window extreme, so
-    that method discarded genuine turning points and real state changes -- it threw
-    away Barrick's actual 2022 cost-shock trough from seven consecutive windows and
-    lagged every inflection. Anchoring on the residual from a rolling median instead
-    means a point is only excluded when it departs from its OWN local trend, which
-    is what "one-off" actually means.
-    """
-    med = d.L1.rolling(MEDIAN_WINDOW, center=True, min_periods=2).median()
-    resid = (d.L1 - med).abs()
-    cutoff = resid.quantile(1 - TRIM_FRACTION)          # the 15% most anomalous points
-    keep = resid <= cutoff
-
-    kept = d.L1.where(keep)
-    d["L2"] = kept.rolling(SMOOTH_WINDOW, min_periods=1).mean()
+    """Drop distressed quarters, then average what is left."""
+    d["aisc_ratio"] = d.aisc_comparable / d.realised_price
+    keep = d.aisc_ratio <= AISC_RATIO_CAP
     d["is_outlier"] = ~keep
+    d["L2"] = d.L1.where(keep).rolling(SMOOTH_WINDOW, min_periods=1).mean()
 
     log = [{"ticker": d.ticker.iloc[0], "quarter": r.quarter, "L1_value": round(r.L1, 2),
-            "rolling_median": round(med.iloc[i], 2), "residual": round(resid.iloc[i], 2),
-            "cutoff": round(cutoff, 2)}
-           for i, r in enumerate(d.itertuples()) if not keep.iloc[i]]
+            "aisc": round(r.aisc_comparable, 0), "realised_price": round(r.realised_price, 0),
+            "aisc_ratio_pct": round(r.aisc_ratio * 100, 1)}
+           for r in d.itertuples() if not keep.iloc[r.Index]]
     return d, log
 
 
@@ -208,7 +181,7 @@ def main():
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
             "w_gold", "L0a", "aisc_margin", "L1", "L2", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
-            "is_outlier", "recon_residual_pct", "flags"]
+            "aisc_ratio", "is_outlier", "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
     out.to_csv(FINAL / "margins.csv", index=False)
     annual = build_annual(frames)
