@@ -862,11 +862,21 @@ def build_annual(frames):
     Averaging four quarterly ratios would weight a small quarter equally with a
     large one. Summing the components and dividing once is the only correct way.
     """
-    rows = []
+    rows, skipped_years = [], []
     for d in frames:
         gaim_col, price_col = REVENUE_BASIS.get(d.ticker.iloc[0], DEFAULT_BASIS)
         for year, g in d.groupby("year"):
             rev, price_rev = g[gaim_col].sum(), g[price_col].sum()
+            # A year in which NO quarter disclosed gold revenue sums to 0.0,
+            # and 0.0 is a denominator. Kinross split metal sales into gold and
+            # silver in its MD&A only from 2011; every 2007 quarter carries a
+            # total_revenue but no gold line, so the year divided by zero and
+            # published L0a = L1 = -inf. -inf is not a margin, and make_chart
+            # reads this file directly. Drop the year and say so -- a year with
+            # nothing in it is absence, not a value.
+            if not rev > 0:
+                skipped_years.append(f"{d.ticker.iloc[0]} {year}")
+                continue
             oz = g.gold_oz_sold.sum()
             royalties = g.royalties.fillna(0).sum() if "royalties" in g else 0
             site = g.opcost_ex_dda.fillna(0).sum() + royalties
@@ -888,7 +898,15 @@ def build_annual(frames):
                 "ticker": d.ticker.iloc[0], "year": year, "periods": len(g),
                 "freq": freq,
                 "months": int(g.months.sum()),
-                "complete": int(g.months.sum()) == 12,
+                # A year is complete when twelve months carry a gold revenue
+                # figure, not when four rows exist. Agnico files a row for every
+                # quarter of 2005 but disclosed nothing usable after Q2, and the
+                # old test read four rows as a full year -- publishing FY2005
+                # gold revenue of $62.6m (two quarters) with complete=True beside
+                # it. The chart already draws this distinction for half-year
+                # buckets; the annual rollup was still counting rows.
+                "usable_months": int(g.months.where(g[gaim_col].notna(), 0).sum()),
+                "complete": int(g.months.where(g[gaim_col].notna(), 0).sum()) == 12,
                 "gold_revenue": round(rev, 1), "gold_oz_sold": int(oz),
                 "realised_price": round(price_rev / oz * 1e6, 0),
                 "L0a": round((rev - site - g.segment_dda.fillna(0).sum()) / rev * 100, 2),
@@ -899,6 +917,9 @@ def build_annual(frames):
                 "aisc_weighted": (None if not len(cov)
                                   else round(aisc_usd * 1e6 / cov.gold_oz_sold.sum(), 0)),
             })
+    if skipped_years:
+        print(f"annual rollup: {len(skipped_years)} company-year(s) dropped for "
+              f"zero disclosed gold revenue: {', '.join(skipped_years)}")
     return pd.DataFrame(rows)
 
 
@@ -940,6 +961,23 @@ def main():
     annual.to_csv(FINAL / "margins_annual.csv", index=False)
     audit.to_csv(FINAL / "censoring_audit.csv", index=False)
     out[out.is_outlier].to_csv(FINAL / "trimmed_observations.csv", index=False)
+
+    # The two Chinese-named exports are the reader-facing CSVs, and nothing in
+    # this pipeline was writing them. They had been sitting in data/final since
+    # the pilot commit -- 88 quarterly rows starting at 2021Q1, next to a
+    # margins.csv holding 478 from 2005Q1 -- so anyone who opened the file named
+    # in their own language got the pilot and no warning that it was four
+    # extractions out of date. Written here so they cannot drift again. The
+    # column lists are the ones those files already had; only the contents move.
+    ZH_Q = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
+            "w_gold", "L0a", "aisc_margin", "L1", "L2", "published_aisc",
+            "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
+            "aisc_ratio", "is_outlier", "recon_residual_pct", "flags"]
+    ZH_A = ["ticker", "year", "quarters", "complete", "gold_revenue", "gold_oz_sold",
+            "realised_price", "L0a", "L1", "aisc_margin", "aisc_weighted"]
+    out.reindex(columns=ZH_Q).to_csv(FINAL / "季度利润率.csv", index=False)
+    (annual.rename(columns={"periods": "quarters"}).reindex(columns=ZH_A)
+           .to_csv(FINAL / "年度利润率.csv", index=False))
 
     print(f"companies: {sorted(out.ticker.unique())}   quarterly rows: {len(out)}   "
           f"annual rows: {len(annual)} ({(~annual.complete).sum()} partial)")
