@@ -232,7 +232,10 @@ function aggregate() {
   for (const s of D.series) {
     if (!SEL.has(s.id)) continue;
     for (const o of s.obs) {
-      if (o.out || !passes(o)) continue;
+      // o.part: this company covers only half of this half-year with usable
+      // data, so counting it would weight one quarter as a full half.
+      // o.h == null: a 12-month annual row, which belongs to no half at all.
+      if (o.out || o.part || o.h == null || !passes(o)) continue;
       if (!bucket.has(o.h)) bucket.set(o.h, { rev: 0, cost: 0, ni: 0, trev: 0,
         aiscUsd: 0, aiscOz: 0, bias: 0, biasHi: 0, co: new Set() });
       const b = bucket.get(o.h);

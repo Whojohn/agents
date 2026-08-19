@@ -140,15 +140,23 @@ SHORT = {'NEM': 'Newmont', 'GOLD': 'Barrick', 'AEM': 'Agnico Eagle', 'KGC': 'Kin
 
 
 def span(period):
-    """(x0, x1) in months since EPOCH-01. Q spans 3 months, H spans 6."""
-    year, kind, n = int(period[:4]), period[4], int(period[5:])
+    """(x0, x1) in months since EPOCH-01. Q spans 3, H spans 6, FY spans 12."""
+    year, kind = int(period[:4]), period[4]
+    if kind == "F":                       # '2005FY' -- Kinross filed nothing
+        x0 = (year - EPOCH) * 12          # interim that year, so the audited
+        return x0, x0 + 12                # annual IS the observation
+    n = int(period[5:])
     width = 3 if kind == "Q" else 6
     x0 = (year - EPOCH) * 12 + (n - 1) * width
     return x0, x0 + width
 
 
 def half_of(period):
-    year, kind, n = int(period[:4]), period[4], int(period[5:])
+    """Half-year bucket, or None for a period that cannot sit in one."""
+    year, kind = int(period[:4]), period[4]
+    if kind == "F":
+        return None                       # 12 months does not go in a 6-month
+    n = int(period[5:])                   # bucket without the split we refused
     return f"{year}H{n if kind == 'H' else (1 if n <= 2 else 2)}"
 
 
@@ -163,14 +171,35 @@ if bad:
     raise SystemExit(f"period label disagrees with months column: {bad[:5]}")
 
 q = q.assign(half=q.quarter.map(half_of))
-# --- invariant: every (ticker, half) bucket must hold exactly six months, or a
-# company contributing one quarter would be weighted against another's full half.
-short = q.groupby(["ticker", "half"]).months.sum()
-short = short[short != 6]
-if len(short):
-    raise SystemExit(f"half-year buckets are not 6 months: {short.to_dict()}")
 
-halves = sorted(q.half.unique(), key=lambda h: (int(h[:4]), int(h[5])))
+# A (ticker, half) bucket that does not total six months cannot be weighted
+# against one that does -- a company contributing a single quarter would count
+# as a full half of industry activity. Until 2005-2012 landed this could not
+# happen, so it was an assert. It happens now for real reasons: Agnico's
+# 2008Q2 and Q3 filings do not exist, Kinross has no 2005 interim at all, and
+# an annual row has no half. Excluding those buckets from the AGGREGATE is
+# right; crashing the build over them is not, and neither is silently
+# weighting three months as six. The observations still draw on the company
+# line -- only the aggregate declines to use them.
+# Months of USABLE data, not months of existing rows. Agnico emits a row for
+# 2008Q2 and 2008Q3 even though no filing exists -- correctly, since the period
+# is real and the nulls are the honest record -- so a bucket can look complete
+# while only one of its two quarters carries a margin. Counting row months
+# would let one quarter stand in for a whole half of industry activity.
+q["_usable_months"] = q.months.where(q.L1.notna(), 0)
+covered = q.groupby(["ticker", "half"])._usable_months.transform("sum")
+q["partial_half"] = q.half.notna() & (covered != 6)
+n_partial = int(q.partial_half.sum())
+if n_partial:
+    by = (q[q.partial_half].groupby("ticker").quarter
+          .agg(lambda s: f"{len(s)} ({s.min()}..{s.max()})").to_dict())
+    print(f"partial half-year buckets excluded from the aggregate: {n_partial} rows  {by}")
+n_annual = int(q.half.isna().sum())
+if n_annual:
+    print(f"annual rows carried on the company line, outside every half bucket: {n_annual}")
+
+halves = sorted([h for h in q.half.dropna().unique()],
+                key=lambda h: (int(h[:4]), int(h[5])))
 audit_by_period = audit.set_index("quarter")
 
 series = []
@@ -183,7 +212,11 @@ for t in ORDER:
         x0, x1 = span(r.quarter)
         flags = str(getattr(r, "flags", "") or "")
         obs.append({
-            "p": r.quarter, "h": r.half, "x0": x0, "x1": x1, "f": r.freq,
+            "p": r.quarter, "h": None if pd.isna(r.half) else r.half,
+            "x0": x0, "x1": x1, "f": r.freq,
+            # Excluded from the aggregate, still drawn: the half is incomplete
+            # for this company, or the row is a 12-month annual.
+            "part": bool(r.partial_half),
             "l1": num(r.L1), "l2": num(r.L2), "l0a": num(r.L0a),
             "l0b": num(r.L0b), "l0badj": num(r.L0b_adj), "aisc": num(r.aisc_margin),
             "grade": r.fidelity_grade, "vec": r.fidelity_vector,
