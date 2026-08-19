@@ -103,7 +103,7 @@ Gold Fields 的 **NCE（Notional Cash Expenditure）= 营业成本 + 全部资�
 | `exploration_expensed` | 4/4 | |
 | `reclamation_accretion` | 4/4（GOLD/KGC/NEM）；AEM 2009 起 1/4 | SFAS 143 自 FY2003 起，本时代全程有效 |
 | `net_interest` | 2–4/4 | |
-| `gold_oz_sold` | AU/GFI/KGC/NEM 4/4；AEM **0/4** | AEM 仍只报产量，须打 `ONLY_PRODUCED` |
+| `gold_oz_sold` | AU/GFI/KGC/NEM 4/4；~~AEM **0/4**~~ **AEM 实为 4/4** | **【2005–2012 提取轮已在原文推翻】**~~AEM 仍只报产量，须打 `ONLY_PRODUCED`~~ —— AEM 逐季披露 `Payable metal sold: Gold (ounces)`，且是**分矿**列示：`2010-Q3_0001047469-10-009664_a2200966zex-99_1.htm`（LaRonde 36,979 / Goldex 49,117 / Kittila 41,655 / Lapa 25,846 / Pinos Altos 31,759）、`2007-Q2_0001047469-07-006473_a2179358zex-99_2.htm`（Gold 57,366，同表并列 Silver/Zinc/Copper 与 `Realized prices`）。本表的正则普查漏掉了 "Payable metal sold" 这个 caption，只找了 "ounces sold" 一类写法。**注意 2013 年后的既有提取其实一直是对的**（`AEM_quarterly.csv` 的 `gold_oz_sold` 54/54 且与 `gold_oz_produced` 逐行不同，全表 0 个 `ONLY_PRODUCED` 标志）——错的只有这份文档。AEM 真正的产出口径问题在**公布的 AISC 分母**是每产出盎司，那与「不披露售出盎司」是两回事，不要混为一谈。 |
 | `cash_tax_paid` | **最弱**：AEM 2009–2012 仅 1/4；AU 2011–2012 **0/4** | 走 C1 年度按季度黄金收入分摊 |
 | `lease_payments` | 不适用 | IFRS 16 / ASC 842 要到 2019 年，本时代属 Tier A-equivalent 零偏差，不是缺口 |
 
