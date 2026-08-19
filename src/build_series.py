@@ -82,6 +82,15 @@ SECTOR_DISTRESS_MIN_N = 2
 
 SMOOTH_WINDOW = 4       # trailing quarters averaged
 
+# ...and at least this many of the window's quarters must actually survive the
+# exclusion. Without a floor, a window whose other three quarters were excluded
+# still reports an "average" -- one built from the single quarter in which the
+# company was not in trouble. That is the exclusion rule feeding the smoother the
+# survivors and the smoother publishing them under a four-quarter label. The cost
+# of the floor is the first two quarters of every company; the cost of not having
+# it falls entirely on troughs, which is where the series has to be right.
+SMOOTH_MIN_PERIODS = 3
+
 
 def load_company(path):
     ticker = path.stem.split("_")[0]
@@ -185,9 +194,16 @@ def flag_outliers(panel):
 
 
 def add_smoothed(d):
-    """Average what survives the exclusion, over a trailing window."""
+    """Average what survives the exclusion, over a trailing window.
+
+    L2_n records how many quarters actually went into each average, so a reader
+    can see when a "four-quarter" figure rests on three.
+    """
     d = d.sort_values("quarter")
-    d["L2"] = d.L1.where(~d.is_outlier).rolling(SMOOTH_WINDOW, min_periods=1).mean()
+    d["L2"] = (d.L1.where(~d.is_outlier)
+               .rolling(SMOOTH_WINDOW, min_periods=SMOOTH_MIN_PERIODS).mean())
+    d["L2_n"] = (d.L1.where(~d.is_outlier)
+                 .rolling(SMOOTH_WINDOW, min_periods=1).count())
     return d
 
 
@@ -257,7 +273,7 @@ def main():
     audit = censoring_audit(panel)
 
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
-            "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "published_aisc",
+            "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
             "aisc_ratio", "is_outlier", "sector_distress", "sector_breach_share",
             "sector_breach_n",
