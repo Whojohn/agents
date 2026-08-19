@@ -105,15 +105,27 @@ def canonical_path(ticker: str) -> Path | None:
     return None
 
 
-def describe_conflict(period: str, a: dict, b: dict) -> list[str]:
-    """Every field where two rows for the same period actually disagree."""
-    out = []
-    for k in a:
+def describe_conflict(period: str, a: dict, b: dict) -> tuple[list[str], dict]:
+    """Fields where two rows for the same period actually disagree, plus the
+    fields the era row can simply FILL.
+
+    A blank on one side and a value on the other is not a disagreement -- it is
+    new information, and refusing it would mean a re-run that adds a column can
+    never be taken. Only two populated values that differ are a conflict.
+    """
+    out, fill = [], {}
+    for k in set(a) | set(b):
         if k in PROVENANCE_FIELDS:
             continue
         va, vb = (a.get(k) or "").strip(), (b.get(k) or "").strip()
         if va == vb:
             continue
+        if not va and vb:
+            fill[k] = vb
+            continue
+        if va and not vb:
+            continue          # canonical keeps what the era file lacks
+
         # Numerically equal but differently formatted is not a conflict.
         try:
             if float(va) == float(vb):
@@ -121,7 +133,7 @@ def describe_conflict(period: str, a: dict, b: dict) -> list[str]:
         except ValueError:
             pass
         out.append(f"      {k:26} canonical={va!r:>18}   era={vb!r}")
-    return out
+    return out, fill
 
 
 def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
@@ -135,7 +147,7 @@ def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
 
     by_period = {r["quarter"]: r for r in rows}
     n_before = len(by_period)
-    added = updated = identical = 0
+    added = updated = identical = filled = 0
     conflicts: list[str] = []
 
     for ef in era_files:
@@ -157,7 +169,11 @@ def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
                 by_period[per] = row
                 added += 1
                 continue
-            diff = describe_conflict(per, by_period[per], row)
+            diff, fill = describe_conflict(per, by_period[per], row)
+            if fill and not diff:
+                by_period[per].update(fill)
+                filled += len(fill)
+                continue
             if not diff:
                 identical += 1
                 continue
@@ -194,7 +210,7 @@ def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
     span = f"{merged[0]['quarter']}..{merged[-1]['quarter']}" if merged else "-"
     rename = canon is not None and canon != target
     print(f"[{ticker}] {n_before} -> {len(merged)} rows  (+{added} new, "
-          f"{identical} identical, {updated} replaced)  {span}  freq={''.join(sorted(freqs))}")
+          f"{identical} identical, {filled} cells filled, {updated} replaced)  {span}  freq={''.join(sorted(freqs))}")
     if rename:
         print(f"[{ticker}] RENAME {canon.name} -> {target.name}  "
               f"(merged set now holds {'/'.join(sorted(freqs))} rows)")
