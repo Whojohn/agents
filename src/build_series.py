@@ -26,9 +26,16 @@ INTERIM, FINAL = ROOT / "data/interim", ROOT / "data/final"
 
 # Group-level costs, allocated to the gold segment pro-rata on gold revenue share
 # (METHODOLOGY 7). Site-level costs are already gold-only and are not allocated.
+# care_and_maintenance: the operating cost of IDLED capacity -- COVID
+# suspensions in 2020, but also Obuasi from 2014 and any mine on standby. It is
+# a real cash cost of the gold business that no field previously captured, and
+# Newmont's own AISC folds it in while our opcost_ex_dda (costs-applicable-to-
+# sales only) does not. Omitting it overstated Newmont's 2020Q2 GAIM by 5.29
+# points. It is NOT a one-off item: it recurs for as long as the idling lasts.
 GROUP_COSTS = [
     "corporate_g_and_a", "exploration_expensed", "capex_total",
     "reclamation_accretion", "lease_payments", "net_interest", "cash_tax_paid",
+    "care_and_maintenance",
 ]
 
 # Revenue column feeding GAIM vs the one feeding realised price. They differ for
@@ -46,7 +53,17 @@ DEFAULT_BASIS = ("segment_revenue_gold", "segment_revenue_gold")
 # flagged on every row it touches — without it those quarters carry no tax at all
 # and GAIM reads several points too high.
 ANNUAL_CASH_TAX = {"NEM": {2013: 361, 2014: 187, 2015: 223, 2016: 85,
+                           2017: 214, 2018: 429, 2019: 437, 2020: 400,
                            2021: 1534, 2022: 1122, 2023: 794}}
+# 2017-2020 read off the 10-K supplemental cash-flow disclosure "Income and
+# mining taxes paid, net of refunds". Each 10-K prints three years, so every
+# figure below is confirmed by two or three separate filings: 214 appears in
+# the FY2017, FY2018 and FY2019 10-Ks; 429 in FY2018/2019/2020; 437 in
+# FY2019/2020. Newmont discloses no interim cash-tax figure at all -- not
+# quarterly, not cumulative -- so there is no subtraction path and the annual
+# total is pro-rated on gold revenue (Tier C, error centred on zero). Without
+# these four years the 2017-2020 rows carried a Tier D zero-fill worth 3.44
+# points of overstated margin apiece, which graded all 16 of them unpublishable.
 # FY2015 is carried at 223 as originally filed. The FY2016 10-K restates the
 # continuing-operations comparative to 77 -- a difference that is the Batu Hijau
 # discontinued-operations reclassification, not a correction. The rest of the
@@ -221,6 +238,16 @@ def load_company(path):
     # published alongside it rather than dropped.
     if "net_income_attributable" in d:
         d["L0b"] = d.net_income_attributable / d.total_revenue * 100
+        # ...and the same margin with non-recurring items taken back out. A
+        # deconsolidation gain is not gold-mining income: Newmont's 2019Q3 net
+        # income of $2,178m is dominated by a $2,366m gain on forming the
+        # Nevada Gold Mines JV, which prints an 80.3% "margin" for a quarter
+        # that earned nothing of the sort. Newmont strips it in its own
+        # non-GAAP reconciliation, as (2,366). This column is null wherever
+        # nobody has looked for such items yet -- absence here means unchecked,
+        # not clean, so L0b_adj falls back to L0b rather than asserting zero.
+        nonrec = (d.l0b_nonrecurring.fillna(0) if "l0b_nonrecurring" in d else 0)
+        d["L0b_adj"] = (d.net_income_attributable - nonrec) / d.total_revenue * 100
     d["realised_price"] = d[price_col] / d.gold_oz_sold * 1e6
 
     # Put every company's AISC on ONE basis before comparing: by-product, per gold
@@ -346,7 +373,7 @@ FIDELITY_FIELDS = [
     "segment_revenue_gold", "total_revenue", "opcost_ex_dda", "royalties",
     "corporate_g_and_a", "exploration_expensed", "capex_total",
     "reclamation_accretion", "lease_payments", "net_interest",
-    "cash_tax_paid", "one_off_items",
+    "cash_tax_paid", "one_off_items", "care_and_maintenance",
 ]
 
 # Cost share of gold revenue, in GAIM points, at two MEASURED price anchors.
@@ -407,7 +434,12 @@ STANDARD_ERA_AEQ = {"lease_payments": 2019, "reclamation_accretion": 2003}
 # the other way would pin literally every row in the panel to D and make the
 # composite grade constant -- a grade that never varies cannot expose a
 # fidelity difference, which is the only reason 9.5 puts it on the chart.
-UNQUANTIFIED_FIELDS = {"one_off_items"}
+# Both of these are known cost categories whose COVERAGE is unverified rather
+# than known-absent. A blank care_and_maintenance usually means no mine was
+# idled that quarter -- exact, not a gap -- but nobody has checked per company,
+# so it caps the grade at C instead of flooring it at D. A row that actually
+# carries the number grades A on that position, which is how the cap clears.
+UNQUANTIFIED_FIELDS = {"one_off_items", "care_and_maintenance"}
 
 TIER_RE = re.compile(r"TIER(AEQ|A|B|C|D):([a-z_]+)(?::([A-Za-z0-9_]+))?")
 TIER_ORDER = {"A": 0, "E": 0, "B": 1, "C": 2, "D": 3}
@@ -493,6 +525,10 @@ def grade_fidelity(d):
         for field in FIDELITY_FIELDS:
             if field in explicit:
                 tier = explicit[field]
+            elif field in d.columns and pd.notna(r.get(field)):
+                # A real extracted value grades A even for a capping field --
+                # that is the whole point of extracting it.
+                tier = "A"
             elif field in UNQUANTIFIED_FIELDS:
                 tier = "D"
             elif field not in d.columns or pd.isna(r.get(field)):
@@ -523,7 +559,8 @@ def grade_fidelity(d):
                 hi += c * 0.5; lo -= c * 0.5
 
         vector = "".join(vec)
-        worst = max(TIER_ORDER[t] for t in vec[:11])   # position 12 caps, not floors
+        worst = max(TIER_ORDER[t] for f, t in zip(FIDELITY_FIELDS, vec)
+                    if f not in UNQUANTIFIED_FIELDS)   # capping fields cap, they do not floor
         # Budget: half the trailing aggregate margin, capped at 2.5pt, floored
         # at 1.0 -- the same number section 11's H3 uses.
         base = r.get("L2") if pd.notna(r.get("L2")) else r.get("L1")
@@ -645,7 +682,7 @@ def main():
     audit = censoring_audit(panel)
 
     cols = ["ticker", "quarter", "freq", "gold_revenue", "gold_oz_sold", "realised_price",
-            "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
+            "w_gold", "L0a", "L0b", "L0b_adj", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
             "net_income_attributable", "impairment_charges",
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
