@@ -553,6 +553,30 @@ def _anchor_at(field, price):
     return (t_c * (b_c / t_c) ** w, t_p90 * (b_p90 / t_p90) ** w, outside)
 
 
+# Descriptive flags that DESCRIBE a Tier-C substitution but were written
+# WITHOUT their machine-read partner. EXTRACTION_CONTRACT section C.2 is
+# explicit that both must be written; 76 rows across two companies wrote
+# only the descriptive half. The grader sees a non-null value and nothing
+# telling it otherwise, so it graded every one of them Tier A.
+#
+# The visible damage was not the grade -- it was the band. Tier C appeared
+# ZERO times in 3,757 vector positions, and because Tier C is the only tier
+# that moves the LOWER edge (A/E/B/D all push one way), bias_pt_lo equalled
+# bias_pt_central on all 289 rows. The panel published an upside band and no
+# downside band at all, which reads as "the estimate cannot be too high" --
+# a claim nobody made and the data does not support.
+#
+# Deriving the tier here rather than patching the interim CSVs is deliberate:
+# the pre-2013 extraction adds hundreds of rows written by other agents, and
+# a rule enforced only by everyone remembering it is not enforced. An
+# explicit TIER flag always wins (setdefault), and every derivation is
+# REPORTED by validate_flags -- derived, never silent.
+DERIVED_TIER = {
+    "CASH_TAX_ALLOCATED_FROM_FY": ("cash_tax_paid", "C"),
+    "GOLD_REV_ALLOCATED_FROM_FY": ("segment_revenue_gold", "C"),
+}
+
+
 def validate_flags(panel):
     """Check the flags the CODE reads. The others are documentation.
 
@@ -574,6 +598,7 @@ def validate_flags(panel):
     """
     read_exact = {"CAT2_SUBSTITUTION", "CAPINT_INCLUDED_IN_CAPEX"}
     problems, descriptive = [], set()
+    derived = {}
     for _, r in panel.iterrows():
         for raw in re.split(r"[;|]", str(r.get("flags") or "")):
             f = raw.strip()
@@ -591,6 +616,11 @@ def validate_flags(panel):
                 pass
             else:
                 descriptive.add(head)
+                if head in DERIVED_TIER:
+                    field, tier = DERIVED_TIER[head]
+                    if f"TIER{tier}:{field}" not in str(r.get("flags") or ""):
+                        derived.setdefault(f"{head} -> TIER{tier}:{field}",
+                                           []).append(f"{r.ticker} {r.quarter}")
                 # Near-miss on a machine-read code: same letters, different
                 # punctuation or a dropped underscore. Silently inert today.
                 squash = head.replace("_", "")
@@ -598,6 +628,9 @@ def validate_flags(panel):
                     if squash == known.replace("_", "") and head != known:
                         problems.append(f"{r.ticker} {r.quarter}: {head!r} looks "
                                         f"like {known!r} but will not be read")
+    for k, rows in sorted(derived.items()):
+        problems.append(f"DERIVED (contract C.2: write both): {k} on {len(rows)} rows, "
+                        f"e.g. {rows[0]}, {rows[-1]}")
     return problems, descriptive
 
 
@@ -608,6 +641,10 @@ def grade_fidelity(d):
         flags = str(r.get("flags") or "").replace("|", ";")
         explicit = {f: ("E" if t == "AEQ" else t)
                     for t, f, _ in TIER_RE.findall(flags)}
+        # An explicit tier flag always wins; the derivation only fills a gap.
+        for code, (field, tier) in DERIVED_TIER.items():
+            if code in flags:
+                explicit.setdefault(field, tier)
         price = r.get("realised_price")
         vec, central, lo, hi, unquant = [], 0.0, 0.0, 0.0, False
 
@@ -634,6 +671,15 @@ def grade_fidelity(d):
 
             if tier in ("A", "E") or field not in BIAS_ANCHOR:
                 if tier == "D" and field in UNQUANTIFIED_FIELDS:
+                    unquant = True
+                # A substitution on a field with no measured anchor is not a
+                # zero-width band, it is an unmeasured one. segment_revenue_gold
+                # is the case that bites: Agnico's 32 pro-rata revenue quarters
+                # would otherwise report Tier C in the vector and +-0.00 beside
+                # it, which reads as "substituted, and we know it cost nothing".
+                # We do not know that. Marking it unquantified routes it through
+                # section 11's capping rule instead of publishing a false zero.
+                elif tier in ("B", "C", "D"):
                     unquant = True
                 continue
             c, p90, outside = _anchor_at(field, price)
