@@ -724,15 +724,30 @@ def grade_fidelity(d):
         vec, central, lo, hi, unquant = [], 0.0, 0.0, 0.0, False
 
         for field in FIDELITY_FIELDS:
+            # Grade the column the BUILD actually read, not the one whose name
+            # happens to be in FIDELITY_FIELDS. They differ for Barrick, whose
+            # cost stack is consolidated-only: REVENUE_BASIS sends GAIM to
+            # segment_revenue_gold_consolidated while the grader was checking
+            # segment_revenue_gold. Barrick's attributable revenue line does not
+            # exist before 2008Q1 -- the restated "as adjusted" table starts in
+            # the FY2008 annual -- so all twelve 2005-2007 quarters scored the
+            # DENOMINATOR as a silent zero-fill (Tier D) while carrying a
+            # perfectly good GAIM computed from a column read in full, 16/16.
+            # A D in position 0 then blocks grade D and drops the row to X.
+            # Twelve publishable quarters were being thrown away over a column
+            # their own margin never touches.
+            col = field
+            if field == "segment_revenue_gold":
+                col = REVENUE_BASIS.get(r.ticker, DEFAULT_BASIS)[0]
             if field in explicit:
                 tier = explicit[field]
-            elif field in d.columns and pd.notna(r.get(field)):
+            elif col in d.columns and pd.notna(r.get(col)):
                 # A real extracted value grades A even for a capping field --
                 # that is the whole point of extracting it.
                 tier = "A"
             elif field in UNQUANTIFIED_FIELDS:
                 tier = "D"
-            elif field not in d.columns or pd.isna(r.get(field)):
+            elif col not in d.columns or pd.isna(r.get(col)):
                 # A null in a GROUP_COSTS column is not neutral: the build
                 # fills it with zero, so the cost is silently omitted. Two
                 # exceptions, both cases where the line was genuinely inside
