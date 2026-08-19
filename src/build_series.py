@@ -62,12 +62,17 @@ TAX_REALLOCATION = {"AEM": [("2026Q1", 1300.0, 2025)]}
 AISC_RATIO_CAP = 0.80
 
 # ...but only when the breach is IDIOSYNCRATIC. The exclusion exists to stop one
-# company's bad year dragging the industry average down. When most of the covered
-# companies breach the cap in the same quarter, the breach is not an outlier --
-# it is the cycle, and dropping it would delete precisely the trough this series
-# exists to show. 2013-2015 is the case that makes this concrete. So a quarter in
-# which this share of covered companies breaches excludes nobody.
-SECTOR_DISTRESS_SHARE = 0.50
+# company's bad year dragging the industry average down. When enough of the
+# covered companies breach the cap in the same quarter, the breach is not an
+# outlier -- it is the cycle, and dropping it would delete precisely the trough
+# this series exists to show. 2013-2015 is the case that makes this concrete. So
+# a quarter in which this share of covered companies breaches excludes nobody.
+#
+# Set at a fifth on the Pareto reading: a fifth of the industry in distress is
+# already a sector condition, not a company problem. Waiting for a majority sets
+# the bar where only a depression clears it, and every ordinary downturn --
+# which is what an investor actually needs to see -- gets excised on the way.
+SECTOR_DISTRESS_SHARE = 0.20
 
 SMOOTH_WINDOW = 4       # trailing quarters averaged
 
