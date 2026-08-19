@@ -74,6 +74,12 @@ AISC_RATIO_CAP = 0.80
 # which is what an investor actually needs to see -- gets excised on the way.
 SECTOR_DISTRESS_SHARE = 0.20
 
+# A share alone binds badly on a small panel: at four or five companies a single
+# breach already clears a fifth, which would shield every quarter and leave the
+# exclusion permanently dormant. So the share must ALSO be backed by at least
+# this many companies. One company is never a sector.
+SECTOR_DISTRESS_MIN_N = 2
+
 SMOOTH_WINDOW = 4       # trailing quarters averaged
 
 
@@ -171,7 +177,9 @@ def flag_outliers(panel):
     panel["aisc_ratio"] = panel.aisc_comparable / panel.realised_price
     breach = panel.aisc_ratio > AISC_RATIO_CAP
     panel["sector_breach_share"] = breach.groupby(panel.quarter).transform("mean")
-    panel["sector_distress"] = panel.sector_breach_share >= SECTOR_DISTRESS_SHARE
+    panel["sector_breach_n"] = breach.groupby(panel.quarter).transform("sum")
+    panel["sector_distress"] = ((panel.sector_breach_share >= SECTOR_DISTRESS_SHARE)
+                                & (panel.sector_breach_n >= SECTOR_DISTRESS_MIN_N))
     panel["is_outlier"] = breach & ~panel.sector_distress
     return panel
 
@@ -252,6 +260,7 @@ def main():
             "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
             "aisc_ratio", "is_outlier", "sector_distress", "sector_breach_share",
+            "sector_breach_n",
             "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
     out.to_csv(FINAL / "margins.csv", index=False)
