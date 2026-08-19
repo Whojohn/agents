@@ -16,6 +16,8 @@ data/final/trimmed_observations.csv.
 """
 import pathlib
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -333,6 +335,187 @@ def add_smoothed(d):
     return d
 
 
+# ---------------------------------------------------------------------------
+# Fidelity grading (DEGRADATION.md section 9)
+# ---------------------------------------------------------------------------
+# Twelve positions, fixed order, one character each: A / E (A-equivalent) /
+# B / C / D. The vector is the honest statement of how each row was built;
+# the composite grade is a summary of it, and the bias columns are what the
+# non-A positions are worth in GAIM percentage points.
+FIDELITY_FIELDS = [
+    "segment_revenue_gold", "total_revenue", "opcost_ex_dda", "royalties",
+    "corporate_g_and_a", "exploration_expensed", "capex_total",
+    "reclamation_accretion", "lease_payments", "net_interest",
+    "cash_tax_paid", "one_off_items",
+]
+
+# Cost share of gold revenue, in GAIM points, at two MEASURED price anchors.
+#   (bull_center, bull_p90, trough_center, trough_p90)
+# bull   = 2021Q1-2026Q2, ounce-weighted realised price $2,494 (n=88)
+# trough = 2013Q1-2016Q4, ounce-weighted realised price $1,267 (n=64)
+#
+# Two anchors, not one anchor plus an elasticity. DEGRADATION section 1.3
+# projected the trough from the bull window with a constant-elasticity price
+# factor; section 1.4 tested that projection against the trough once it was
+# extracted and found it over-predicts eight of ten line items and flips the
+# sign of aggregate GAIM (-6.9% predicted against +12.5% measured), because a
+# purely mechanical price model has no term for managements cutting capex and
+# exploration -- the two lines whose measured elasticity came in at ~0.
+# Interpolating between two measured points cannot make that mistake.
+BIAS_ANCHOR = {
+    "opcost_ex_dda":         (41.67, 53.17, 51.82, 61.50),
+    "royalties":             ( 3.75,  4.95,  2.47,  2.75),
+    "corporate_g_and_a":     ( 2.01,  3.50,  3.62,  5.92),
+    "exploration_expensed":  ( 2.92,  4.52,  3.01,  6.09),
+    "capex_total":           (20.92, 28.25, 19.93, 33.30),
+    "reclamation_accretion": ( 0.81,  1.78,  0.97,  1.35),
+    "lease_payments":        ( 0.33,  0.72,  0.77,  1.53),
+    "net_interest":          ( 1.08,  2.23,  3.11,  8.24),
+    "cash_tax_paid":         ( 6.70, 16.21,  3.44,  7.96),
+    # Losing the split makes w_gold := 1, which UNDERSTATES cost and so
+    # overstates GAIM; sign handled with the others, magnitude per 9.4.
+    "total_revenue":         ( 2.83,  2.83,  2.83,  2.83),
+}
+ANCHOR_P_BULL, ANCHOR_P_TROUGH = 2494.0, 1267.0
+
+# Legacy flags predate the TIER* vocabulary. A bare NOT_DISCLOSED grades D --
+# a silent zero-fill -- EXCEPT for the (company, field) pairs section 1.1
+# verified as bundled into a line already being counted, which are the
+# original A-equivalent precedent. Anything not on this list stays D, so the
+# unmodernised flags show up as work to do rather than being assumed away.
+LEGACY_A_EQUIVALENT = {
+    ("AEM", "royalties"), ("KGC", "royalties"), ("NEM", "royalties"),
+    ("AEM", "reclamation_accretion"),
+}
+
+# Some gaps are properties of the accounting standard, not of the filer, and
+# they are A-equivalent everywhere at once: the cost was real but sat inside a
+# line already being counted, so entering nothing loses nothing. Keyed by the
+# first year the separate line is required to exist.
+#   lease_payments: IFRS 16 and ASC 842 both bind from 2019-01-01. Before that
+#     operating leases were an expense inside operating costs -- which the
+#     build already deducts -- so a null is exact, not a zero-fill.
+#   reclamation_accretion: SFAS 143 from FY2003, before the panel starts.
+STANDARD_ERA_AEQ = {"lease_payments": 2019, "reclamation_accretion": 2003}
+
+# one_off_items does not exist as a column for ANY company in ANY period
+# (section 3.12). It is a whole-domain unquantified wedge, and the spec is
+# internally inconsistent about what that does: 9.3 says a D anywhere forces
+# grade D, while 3.12 and 11 say it CAPS the grade at C. Those cannot both
+# hold. Resolved here in favour of the cap: max(tier) is taken over the
+# eleven quantified positions, and position 12 sets the C ceiling. Reading it
+# the other way would pin literally every row in the panel to D and make the
+# composite grade constant -- a grade that never varies cannot expose a
+# fidelity difference, which is the only reason 9.5 puts it on the chart.
+UNQUANTIFIED_FIELDS = {"one_off_items"}
+
+TIER_RE = re.compile(r"TIER(AEQ|A|B|C|D):([a-z_]+)(?::([A-Za-z0-9_]+))?")
+TIER_ORDER = {"A": 0, "E": 0, "B": 1, "C": 2, "D": 3}
+
+BUDGET_CAP, BUDGET_FLOOR = 2.5, 1.0
+
+
+def _anchor_at(field, price):
+    """Cost share for `field` at `price`, log-interpolated between two MEASURED
+    anchors. Outside [trough, bull] the value is clamped and the caller marks
+    the row unquantified -- section 1.4.4 forbids extrapolating the factor
+    below $1,267, and the 2005-2012 era ($450-1,670) sits partly under it."""
+    b_c, b_p90, t_c, t_p90 = BIAS_ANCHOR[field]
+    if not price or pd.isna(price):
+        return t_c, t_p90, True
+    p = float(price)
+    outside = not (ANCHOR_P_TROUGH <= p <= ANCHOR_P_BULL)
+    p = min(max(p, ANCHOR_P_TROUGH), ANCHOR_P_BULL)
+    if b_c <= 0 or t_c <= 0:
+        return t_c, t_p90, outside
+    w = np.log(p / ANCHOR_P_TROUGH) / np.log(ANCHOR_P_BULL / ANCHOR_P_TROUGH)
+    return (t_c * (b_c / t_c) ** w, t_p90 * (b_p90 / t_p90) ** w, outside)
+
+
+def grade_fidelity(d):
+    """Per-row fidelity vector, bias budget and composite grade (section 9)."""
+    vectors, centrals, los, his, grades, headline, prefs, notes = [], [], [], [], [], [], [], []
+    for _, r in d.iterrows():
+        flags = str(r.get("flags") or "").replace("|", ";")
+        explicit = {f: ("E" if t == "AEQ" else t)
+                    for t, f, _ in TIER_RE.findall(flags)}
+        price = r.get("realised_price")
+        vec, central, lo, hi, unquant = [], 0.0, 0.0, 0.0, False
+
+        for field in FIDELITY_FIELDS:
+            if field in explicit:
+                tier = explicit[field]
+            elif field in UNQUANTIFIED_FIELDS:
+                tier = "D"
+            elif field not in d.columns or pd.isna(r.get(field)):
+                # A null in a GROUP_COSTS column is not neutral: the build
+                # fills it with zero, so the cost is silently omitted. Two
+                # exceptions, both cases where the line was genuinely inside
+                # another line rather than missing.
+                pre_standard = int(str(r.quarter)[:4]) < STANDARD_ERA_AEQ.get(field, 0)
+                tier = ("E" if pre_standard
+                        or (r.ticker, field) in LEGACY_A_EQUIVALENT else "D")
+            else:
+                tier = "A"
+            vec.append(tier)
+
+            if tier in ("A", "E") or field not in BIAS_ANCHOR:
+                if tier == "D" and field in UNQUANTIFIED_FIELDS:
+                    unquant = True
+                continue
+            c, p90, outside = _anchor_at(field, price)
+            unquant = unquant or outside
+            if tier == "D":            # zeroed: the whole wedge is the error
+                central += c; hi += p90
+            elif tier == "B":          # substituted: half the wedge, centred
+                central += c * 0.5; hi += p90 * 0.5
+            # Tier C (pro-rata) is centred on zero by construction -- section 5
+            # measures its error mean at ~0 -- so it moves only the band.
+            if tier == "C":
+                hi += c * 0.5; lo -= c * 0.5
+
+        vector = "".join(vec)
+        worst = max(TIER_ORDER[t] for t in vec[:11])   # position 12 caps, not floors
+        # Budget: half the trailing aggregate margin, capped at 2.5pt, floored
+        # at 1.0 -- the same number section 11's H3 uses.
+        base = r.get("L2") if pd.notna(r.get("L2")) else r.get("L1")
+        budget = BUDGET_CAP if pd.isna(base) else min(BUDGET_CAP, max(BUDGET_FLOOR, 0.5 * base))
+
+        if worst == 0:
+            g = "A"
+        elif worst == 1 and abs(central) <= 1.0 and not unquant:
+            g = "B"
+        elif worst <= 2 and abs(central) <= budget:
+            g = "C"
+        elif abs(central) <= budget and vec[0] in "AB" and vec[2] in "ABC" and vec[6] in "ABC":
+            g = "D"
+        else:
+            g = "X"
+        if unquant and g in ("A", "B"):
+            g = "C"                                     # section 11 capping rule
+        cat2 = "CAT2_SUBSTITUTION" in flags
+        if cat2 and g in ("A", "B"):
+            g = "C"
+
+        vectors.append(vector); centrals.append(round(central, 2))
+        los.append(round(central + lo, 2)); his.append(round(central + hi, 2))
+        grades.append(g); headline.append(g != "X" and not cat2)
+        prefs.append(None if pd.isna(price) else round(float(price), 0))
+        notes.append("price outside the two measured anchors; magnitude unquantified"
+                     if unquant and (pd.isna(price) or not
+                        (ANCHOR_P_TROUGH <= float(price) <= ANCHOR_P_BULL)) else "")
+
+    d = d.copy()
+    d["fidelity_vector"] = vectors
+    d["fidelity_grade"] = grades
+    d["bias_pt_central"] = centrals
+    d["bias_pt_lo"], d["bias_pt_hi"] = los, his
+    d["bias_price_ref"] = prefs
+    d["in_headline_aggregate"] = headline
+    d["bias_note"] = notes
+    return d
+
+
 def censoring_audit(panel):
     """One row per quarter recording what the exclusion rule did, and to whom.
 
@@ -409,7 +592,7 @@ def main():
         raise SystemExit("no extracted company files in data/interim/")
 
     panel = flag_outliers(pd.concat(load_company(p) for p in files))
-    frames = [add_smoothed(g) for _, g in panel.groupby("ticker")]
+    frames = [grade_fidelity(add_smoothed(g)) for _, g in panel.groupby("ticker")]
     audit = censoring_audit(panel)
 
     cols = ["ticker", "quarter", "freq", "gold_revenue", "gold_oz_sold", "realised_price",
@@ -419,7 +602,10 @@ def main():
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
             "panel_n_q", "L2_months", "months", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",
-            "recon_residual_pct", "flags"]
+            "recon_residual_pct",
+            "fidelity_vector", "fidelity_grade", "bias_pt_central",
+            "bias_pt_lo", "bias_pt_hi", "bias_price_ref",
+            "in_headline_aggregate", "bias_note", "flags"]
     # Sort on the chronological key, NOT on the period string -- 'H' < 'Q' would
     # put 2021H2 ahead of 2021Q1 and hand every downstream consumer a series that
     # runs backwards through its own mixed-frequency years.
@@ -445,6 +631,15 @@ def main():
     for t, g in out.groupby("ticker"):
         print(f"  {t:5} L0a {g.L0a.mean():5.1f}%  AISC {g.aisc_margin.mean():5.1f}%  "
               f"GAIM {g.L1.mean():5.1f}%  gap {(g.aisc_margin - g.L1).mean():5.1f}pt")
+
+    print("\nfidelity grades: " + "  ".join(
+        f"{g}={n}" for g, n in out.fidelity_grade.value_counts().sort_index().items()))
+    print("bias_pt_central: mean %+.2f  max %+.2f  rows over budget: %d"
+          % (out.bias_pt_central.mean(), out.bias_pt_central.max(),
+             int((out.fidelity_grade == "X").sum())))
+    worst = out.nlargest(5, "bias_pt_central")[
+        ["ticker", "quarter", "fidelity_vector", "fidelity_grade", "bias_pt_central"]]
+    print(worst.to_string(index=False))
 
     violations = out[out.aisc_margin <= out.L1]
     print(f"\ninvariant AISC margin > GAIM: {'HOLDS' if violations.empty else 'VIOLATED'}"
