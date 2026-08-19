@@ -1,4 +1,4 @@
-# Extraction Contract v0.1 — binding on every extraction agent
+# Extraction Contract v0.2 — binding on every extraction agent
 
 This document removes discretion. Where it and METHODOLOGY.md disagree, this one wins for
 extraction mechanics; METHODOLOGY.md wins for what the metric means.
@@ -33,7 +33,41 @@ No figure enters the dataset without all four:
 This is what lets the audit team re-verify without re-reading the whole document. An agent that
 cannot cite the caption did not read the statement.
 
-## C. Flag vocabulary — closed set, do not invent new codes
+## C. Flag vocabulary — three machine-read families, plus open documentation
+
+**v0.2 correction.** This section used to say "closed set, do not invent new codes."
+That was never true in practice and is not the right rule. **68 distinct descriptive
+codes are in active use** that this document never defined, and most carry information
+no generic code could (`SUKARI_CONSOLIDATED_100PCT_AGA_OWNS_50PCT`,
+`H2_AISC_TABLE_DISCLOSED_IN_NEXT_H1_RELEASE`). Suppressing them would destroy
+provenance to satisfy a rule nothing enforced.
+
+The workable distinction is not open-vs-closed, it is **read-vs-descriptive**.
+
+### C.1 Machine-read flags — exactly three families, spelling is load-bearing
+
+| Flag | What reads it | What happens if you misspell it |
+|---|---|---|
+| `TIER<A\|AEQ\|B\|C\|D>:<field>[:<code>]` | `build_series.grade_fidelity` | The regex does not match, the position silently falls back to its default tier, and the row grades **as if you never wrote the flag** |
+| `CAT2_SUBSTITUTION` | headline-aggregate cap | The row silently stays in the headline aggregate |
+| `CAPINT_INCLUDED_IN_CAPEX` | capitalised-interest add-back | Capitalised interest is silently added twice |
+
+`<field>` must be one of the twelve names in `FIDELITY_FIELDS` (DEGRADATION §9.1).
+**`src/build_series.py:validate_flags` now checks all three** and reports unparseable
+tier flags, tier flags naming a non-existent field, and near-miss spellings of the two
+literals. Before that check existed, every one of these failed silently — a correction
+that looks applied and isn't is worse than no correction.
+
+### C.2 Descriptive flags — open, but they are a record, not a shrug
+
+Anything else is documentation for a human reader. Write them freely, but:
+- **UPPER_SNAKE_CASE**, and specific enough to be re-checkable a year later.
+- A descriptive flag never substitutes for a machine-read one. If a line is bundled,
+  `ROYALTIES_IN_OPCOST` is a fine note but `TIERAEQ:royalties:BUNDLED_IN_OPCOST` is
+  what actually stops the build treating it as a silent zero-fill. **Write both.**
+- Prefer an existing code over a synonym — grep the interim CSVs before coining one.
+
+### C.3 The originally-defined codes (all still valid)
 
 | Flag | Meaning |
 |---|---|

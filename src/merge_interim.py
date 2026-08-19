@@ -19,7 +19,18 @@ land at once now, and a hand merge has three silent failure modes:
    prints the disagreement. Two extractions of the same quarter that differ
    is news, not a merge conflict to resolve by fiat.
 
-2. **Frequency drift in the filename.** The canonical filename encodes the
+2. **Column-set drift.** The six canonical files do NOT share a header: 30
+   columns are common, 38 appear across the union, and each company carries
+   its own extras (Barrick's ``segment_revenue_gold_consolidated`` is what
+   ``REVENUE_BASIS`` reads for it; Agnico's ``aisc_denominator_oz`` is what
+   restates its per-ounce-produced AISC). So header equality is the WRONG
+   test -- it would reject a perfectly good era file for lacking a column its
+   company never uses. The merge takes the union, fills the absent side with
+   empty, and PRINTS which columns each side lacked. Empty is the honest
+   value there, and the fidelity grading reads it as the gap it is; what
+   would be dishonest is doing it silently.
+
+3. **Frequency drift in the filename.** The canonical filename encodes the
    frequency, and ``build_series.py`` globs on it. If an era file brings a
    half-year row into a file named ``_quarterly.csv``, the row is loaded but
    the NAME now lies. Worse, if it brings a quarterly row into
@@ -27,7 +38,7 @@ land at once now, and a hand merge has three silent failure modes:
    ``_mixed.csv`` when the merged set actually contains both, so the glob
    and the contents stay in agreement.
 
-3. **Collation.** ``'H'(72) < 'Q'(81)`` in ASCII, so a plain string sort puts
+4. **Collation.** ``'H'(72) < 'Q'(81)`` in ASCII, so a plain string sort puts
    ``2021H2`` BEFORE ``2021Q1`` and silently reverses a company's own history
    for every downstream window function. Rows are ordered on a real
    chronological key, never on the period string.
@@ -76,7 +87,7 @@ def period_start_month(period: str) -> int:
 
 
 def period_order(period: str) -> int:
-    """Chronological sort key. See failure mode 3 in the module docstring."""
+    """Chronological sort key. See failure mode 4 in the module docstring."""
     return int(str(period)[:4]) * 100 + period_start_month(period)
 
 
@@ -129,20 +140,16 @@ def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
 
     for ef in era_files:
         eh, erows = read_csv(ef)
-        if header and eh != header:
-            print(f"[{ticker}] HEADER MISMATCH in {ef.name}", file=sys.stderr)
-            only_era = [c for c in eh if c not in header]
-            only_can = [c for c in header if c not in eh]
-            if only_era:
-                print(f"    columns only in era file: {only_era}", file=sys.stderr)
-            if only_can:
-                print(f"    columns only in canonical: {only_can}", file=sys.stderr)
-            if not only_era and not only_can:
-                print("    same columns, different ORDER -- refusing to guess",
-                      file=sys.stderr)
-            return False
-        if not header:
-            header = eh
+        only_era = [c for c in eh if c not in header]
+        only_can = [c for c in header if c not in eh]
+        if only_can:
+            print(f"[{ticker}] {ef.name} has no column for: {only_can}")
+            print(f"         -> empty on its {len(erows)} rows; the fidelity "
+                  f"grading will read that as the gap it is")
+        if only_era:
+            print(f"[{ticker}] {ef.name} brings new columns: {only_era}")
+            print(f"         -> empty on the {len(rows)} rows already held")
+        header = header + only_era
 
         for row in erows:
             per = row["quarter"]
@@ -176,6 +183,9 @@ def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
         return False
 
     merged = sorted(by_period.values(), key=lambda r: period_order(r["quarter"]))
+    for r in merged:                       # square every row to the union
+        for c in header:
+            r.setdefault(c, "")
     freqs = {period_freq(r["quarter"]) for r in merged}
     suffix = ("_mixed.csv" if len(freqs) > 1
               else "_quarterly.csv" if freqs == {"Q"} else "_halfyearly.csv")

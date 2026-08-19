@@ -483,6 +483,15 @@ GAIM 用总 capex 而非 D&A，**且不需要 sustaining / growth 拆分**——
 
 **资本化利息**：处理方式因申报人而异且**符号相反**（`build_series.py` 已内置：GOLD 双重计入需扣除，KGC 遗漏需补入）。实测 `capitalised_interest` 占黄金收入**条件均值 0.71 pt、p90 2.30 pt、最大 4.38 pt（n=56）**（v1 印的 0.45/1.44 是零填充值，稀释了该情形真正发生时的量级）。新申报人入库前必须逐一判定，判定结论写入 flag（`CAPINT_DEDUPED` / `CAPINT_ADDED` / `CAPINT_NEUTRAL`）。
 
+> **v3 实测更正（Kinross）**：本节与 `docs/review/EXTRACTION_2013_2016.md` 都把资本化利息
+> 单列的时点写成「2021–2026」。实测不是。对 Kinross 而言，现金流量表里
+> `Interest paid capitalized to property, plant and equipment` 这一行**首次出现在 2020Q1**，
+> 2019Q1–Q3 的同一张表没有它（grep 2019-Q1/Q3 全部 exhibit 命中 0，2020-Q1/Q3 各命中 2 份）。
+> 因此 2017–2019 记 `CAPINT_INCLUDED_IN_CAPEX`、2020 起单列，转换点比本节原先所写早了整整一年。
+> **该 flag 是三个 machine-read flag 之一**（见 EXTRACTION_CONTRACT §C.1），写错时点会让
+> 资本化利息被**重复计入**，方向是把 GAIM 压低——不是无害的文档瑕疵。
+
+
 ### 3.8 `reclamation_accretion` —— 复垦摊提（真缺口 vs 假缺口）
 
 **这是设计约束 2 所说的第二个"看似缺口"的例子，且比租赁更微妙。**

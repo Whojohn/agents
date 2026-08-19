@@ -432,6 +432,54 @@ def _anchor_at(field, price):
     return (t_c * (b_c / t_c) ** w, t_p90 * (b_p90 / t_p90) ** w, outside)
 
 
+def validate_flags(panel):
+    """Check the flags the CODE reads. The others are documentation.
+
+    EXTRACTION_CONTRACT.md calls its flag list a closed set. It is not one:
+    56 distinct codes are in active use that the contract never defined, and
+    most carry real information worth keeping (SUKARI_CONSOLIDATED_100PCT_...
+    says something no generic code could). The workable split is not
+    open-versus-closed but read-versus-descriptive.
+
+    Exactly three flag families change a number:
+      TIER<x>:<field>[:<code>]  -> the fidelity vector, and through it the grade
+      CAT2_SUBSTITUTION         -> drops the row from the headline aggregate
+      CAPINT_INCLUDED_IN_CAPEX  -> suppresses the capitalised-interest add-back
+    Those are validated here. A TIER flag naming a field that does not exist,
+    or a near-miss spelling of one of the three, currently fails SILENTLY: the
+    regex simply does not match, the position falls through to its default
+    tier, and the row grades as though the flag had never been written. That
+    is the worst possible failure -- a correction that looks applied and isn't.
+    """
+    read_exact = {"CAT2_SUBSTITUTION", "CAPINT_INCLUDED_IN_CAPEX"}
+    problems, descriptive = [], set()
+    for _, r in panel.iterrows():
+        for raw in re.split(r"[;|]", str(r.get("flags") or "")):
+            f = raw.strip()
+            if not f:
+                continue
+            head = f.split(":")[0]
+            if head.startswith("TIER"):
+                m = TIER_RE.fullmatch(f) or TIER_RE.match(f)
+                if not m:
+                    problems.append(f"{r.ticker} {r.quarter}: unparseable tier flag {f!r}")
+                elif m.group(2) not in FIDELITY_FIELDS:
+                    problems.append(f"{r.ticker} {r.quarter}: tier flag names "
+                                    f"unknown field {m.group(2)!r} in {f!r}")
+            elif head in read_exact:
+                pass
+            else:
+                descriptive.add(head)
+                # Near-miss on a machine-read code: same letters, different
+                # punctuation or a dropped underscore. Silently inert today.
+                squash = head.replace("_", "")
+                for known in read_exact | {"TIER"}:
+                    if squash == known.replace("_", "") and head != known:
+                        problems.append(f"{r.ticker} {r.quarter}: {head!r} looks "
+                                        f"like {known!r} but will not be read")
+    return problems, descriptive
+
+
 def grade_fidelity(d):
     """Per-row fidelity vector, bias budget and composite grade (section 9)."""
     vectors, centrals, los, his, grades, headline, prefs, notes = [], [], [], [], [], [], [], []
@@ -592,6 +640,7 @@ def main():
         raise SystemExit("no extracted company files in data/interim/")
 
     panel = flag_outliers(pd.concat(load_company(p) for p in files))
+    flag_problems, descriptive_flags = validate_flags(panel)
     frames = [grade_fidelity(add_smoothed(g)) for _, g in panel.groupby("ticker")]
     audit = censoring_audit(panel)
 
@@ -632,7 +681,13 @@ def main():
         print(f"  {t:5} L0a {g.L0a.mean():5.1f}%  AISC {g.aisc_margin.mean():5.1f}%  "
               f"GAIM {g.L1.mean():5.1f}%  gap {(g.aisc_margin - g.L1).mean():5.1f}pt")
 
-    print("\nfidelity grades: " + "  ".join(
+    print(f"\nflag vocabulary: 3 machine-read families, "
+          f"{len(descriptive_flags)} descriptive codes in use")
+    if flag_problems:
+        print("FLAG DEFECTS (these change a grade and fail silently):")
+        for pr in flag_problems:
+            print("  " + pr)
+    print("fidelity grades: " + "  ".join(
         f"{g}={n}" for g, n in out.fidelity_grade.value_counts().sort_index().items()))
     print("bias_pt_central: mean %+.2f  max %+.2f  rows over budget: %d"
           % (out.bias_pt_central.mean(), out.bias_pt_central.max(),
