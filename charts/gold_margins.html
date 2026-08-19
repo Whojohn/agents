@@ -134,8 +134,8 @@
   <div class="picker" id="picker"></div>
   <div class="exp">
     <span class="lab">保真度筛选</span>
-    <button class="btn" data-grade="all">全部观测</button>
-    <button class="btn" data-grade="hl">排除 X 级（不可发布）</button>
+    <button class="btn" data-grade="all">全部观测（含 X 级）</button>
+    <button class="btn" data-grade="hl">排除 X 级（不可发布 · 默认）</button>
     <button class="btn" data-grade="ab">仅 A/B 级</button>
   </div>
   <div class="exp">
@@ -190,8 +190,18 @@ const YEAR0 = D.epoch + Math.ceil(D.xmin / 12);
 const YEAR_SPAN = (D.xmax - D.xmin) / 12;
 const YEAR_STEP = YEAR_SPAN > 18 ? 2 : 1;
 const SEL = new Set(D.series.map(s => s.id));
-let gradeMode = 'all';
-const LAYER = { gaim: true, aisc: true, l0b: true, co: false, band: true };
+// Default EXCLUDES X, because the era table below the chart excludes X and the
+// note between them says so. With 'all' as the default the drawn line silently
+// included 22 observations the spec calls unpublishable while the caption
+// underneath claimed they were out -- the page asserted one basis and rendered
+// another. "All observations" is still one click away; it is now the opt-in.
+let gradeMode = 'hl';
+// Per-company curves ON by default. The legend explains that dashes encode
+// fidelity and hollow points are trimmed observations; with co:false none of
+// that was on screen, so the legend described an invisible layer and the
+// trimmed observations the strip promises are "kept in place, none vanished"
+// were in fact not drawn.
+const LAYER = { gaim: true, aisc: true, l0b: true, co: true, band: true };
 
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t);
@@ -529,8 +539,9 @@ function render() {
          因此规范里的「仅 A/B」视图在今天必然是空的。把这个视图留在这里，是因为「面板里最好的观测也只有 C 级」
          本身就是关于这份数据最该先知道的事。</div>`
       : gradeMode === 'hl'
-      ? `<div class="warn">已排除 <b>${D.gradeCounts.X || 0}</b> 个 X 级观测（偏差超出该期预算，规范判定不可发布）。
-         聚合线随之重算——注意这会同时改变覆盖公司数，某些半年可能因此跌破 ${D.aggMinPanel} 家而留空。</div>`
+      ? `<div class="warn"><b>当前为默认口径</b>：已排除 <b>${D.gradeCounts.X || 0}</b> 个 X 级观测（偏差超出该期预算，规范判定不可发布），
+         与下方「三个时代」表同一口径。剔除会同时减少覆盖公司数，某些半年可能因此跌破 ${D.aggMinPanel} 家而留空。
+         点「全部观测（含 X 级）」可以看到把它们放回去的样子。</div>`
       : '';
   drawMain(); drawSmall(); csv();
 }
