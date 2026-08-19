@@ -183,6 +183,12 @@
 
 <script>
 const D = __DATA__;
+// First year on the axis, and how many years between gridlines. A 2013-2026
+// panel is 14 labels and fits; adding 2005-2012 makes 22, which overlap at
+// this width, so the step opens up once the span gets long.
+const YEAR0 = D.epoch + Math.ceil(D.xmin / 12);
+const YEAR_SPAN = (D.xmax - D.xmin) / 12;
+const YEAR_STEP = YEAR_SPAN > 18 ? 2 : 1;
 const SEL = new Set(D.series.map(s => s.id));
 let gradeMode = 'all';
 const LAYER = { gaim: true, aisc: true, l0b: true, co: false, band: true };
@@ -268,7 +274,7 @@ function drawMain() {
   const W = 1020, L = 52, R = 16;
   const agg = aggregate();
   const drawn = agg.filter(r => r.enough);
-  const X = m => L + m / D.xmax * (W - L - R);
+  const X = m => L + (m - D.xmin) / (D.xmax - D.xmin) * (W - L - R);
 
   const TOP = { y0: 16, y1: 322 };
   // Hover surface goes in FIRST. Appended last it sat on top of every marker
@@ -305,7 +311,7 @@ function drawMain() {
       const t = el('text', { x: L - 8, y: Y(v) + 4, class: 'ax', 'text-anchor': 'end' });
       t.textContent = (Math.round(v * 10) / 10) + '%'; svg.appendChild(t);
     }
-    for (let y = D.epoch; (y - D.epoch) * 12 <= D.xmax; y++) {
+    for (let y = YEAR0; (y - D.epoch) * 12 <= D.xmax; y += YEAR_STEP) {
       const m = (y - D.epoch) * 12;
       svg.appendChild(el('line', { x1: X(m), x2: X(m), y1: band.y0, y2: band.y1, class: 'grid' }));
     }
@@ -376,7 +382,7 @@ function drawMain() {
 
   // ---------- x labels, once, under whichever panel is last
   const base = BOT ? BOT.y1 : TOP.y1;
-  for (let y = D.epoch; (y - D.epoch) * 12 <= D.xmax; y++) {
+  for (let y = YEAR0; (y - D.epoch) * 12 <= D.xmax; y += YEAR_STEP) {
     const t = el('text', { x: X((y - D.epoch) * 12) + 3, y: base + 15, class: 'ax' });
     t.textContent = y; svg.appendChild(t);
   }
@@ -546,7 +552,7 @@ function drawSmall() {
     if (!vals.length) continue;
     let lo = Math.min(...vals, 0), hi = Math.max(...vals);
     lo = Math.floor(lo / 20) * 20; hi = Math.ceil(hi / 20) * 20;
-    const X = m => L + m / D.xmax * (W - L - R), Y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+    const X = m => L + (m - D.xmin) / (D.xmax - D.xmin) * (W - L - R), Y = v => T + (hi - v) / (hi - lo) * (H - T - B);
     for (let v = lo; v <= hi; v += 20) {
       svg.appendChild(el('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: v === 0 ? 'zero' : 'grid' }));
       const t = el('text', { x: L - 5, y: Y(v) + 3.5, class: 'ax', 'text-anchor': 'end' });

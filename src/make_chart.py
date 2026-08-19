@@ -250,6 +250,12 @@ for lo, hi, label in [(2013, 2016, "2013–2016 谷底"), (2017, 2020, "2017–2
 
 payload = {
     "epoch": EPOCH,
+    # Both ends, not just the far one. The front end used to scale x as
+    # m / xmax, which silently assumes the series starts at the epoch. It did
+    # while the panel began in 2013Q1 (x0 = 0). The 2005-2012 extraction makes
+    # 2005Q1 map to -96, and every one of those points would have been drawn
+    # off the left edge of the plot area, on top of the y-axis labels.
+    "xmin": min(span(p)[0] for p in q.quarter),
     "xmax": max(span(p)[1] for p in q.quarter),
     "halves": halves, "aggMinPanel": AGG_MIN_PANEL,
     "series": series, "strip": strip, "eras": eras,
