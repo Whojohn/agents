@@ -1,8 +1,8 @@
 quarter,companies_covered,panel_n_scored,L1_median_q,L1_scale_q,companies_excluded,excluded_tickers,excluded_devs,L1_kept,L1_all,companies_breaching_aisc_cap,breaching_tickers,sector_distress_diagnostic
-2013Q1,6,6,4.38,9.94,0,,,2.02,2.02,0,,False
-2013Q2,6,6,-13.87,11.4,0,,,-18.35,-18.35,3,AEM;GFI;NEM,True
-2013Q3,6,6,-2.59,7.25,0,,,0.06,0.06,3,AU;GFI;KGC,True
-2013Q4,6,6,-0.23,8.92,0,,,-4.62,-4.62,4,AU;GFI;KGC;NEM,True
+2013Q1,6,6,3.82,9.91,0,,,1.67,1.67,0,,False
+2013Q2,6,6,-13.87,8.54,1,AEM,AEM-30.4,-13.93,-18.99,3,AEM;GFI;NEM,True
+2013Q3,6,6,-2.59,7.25,0,,,-0.32,-0.32,3,AU;GFI;KGC,True
+2013Q4,6,6,-0.23,8.92,1,GOLD,GOLD-29.7,-0.99,-5.81,4,AU;GFI;KGC;NEM,True
 2014Q1,6,6,9.95,4.82,0,,,11.12,11.12,3,AU;GFI;NEM,True
 2014Q2,6,6,8.79,4.42,0,,,8.19,8.19,3,AU;GFI;NEM,True
 2014Q3,6,6,9.0,6.43,0,,,8.0,8.0,3,AEM;AU;GFI,True
