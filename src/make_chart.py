@@ -1,26 +1,52 @@
 #!/usr/bin/env python3
-"""Assemble the chart payload: quarterly series, annual series, and per-company
-source/method metadata for the collapsible appendix."""
+"""Assemble the chart payload.
+
+Two things this file refuses to do, because both would invent data:
+
+1. It does not put half-yearly observations onto a quarterly axis. Gold Fields
+   files financial statements twice a year and AngloGold stopped filing
+   standalone quarterlies in 2016; splitting those into quarters is exactly the
+   pro-rata the methodology forbids. Every observation therefore carries its own
+   [x0, x1) span in months, and the axis is continuous months, not slots.
+
+2. It does not compute the aggregate at a frequency finer than the slowest
+   reporter in the selection. The aggregate buckets are HALF-YEARS, so a
+   half-yearly filer contributes one whole observation and a quarterly filer
+   contributes two -- six months of revenue either way, verified below.
+
+Everything the front end needs to draw grade, bias and censoring is pushed here;
+the page recomputes no thresholds of its own (DEGRADATION 9.5 item 7).
+"""
 import json
 import pathlib
 
 import pandas as pd
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+EPOCH = 2013
+AGG_MIN_PANEL = 4   # below this many companies in a bucket the aggregate is not drawn
+
 q = pd.read_csv(ROOT / "data/final/margins.csv")
 a = pd.read_csv(ROOT / "data/final/margins_annual.csv")
+audit = pd.read_csv(ROOT / "data/final/censoring_audit.csv")
+
+# Position of each fidelity_vector character, so the tooltip can name the field
+# that earned the grade instead of showing 13 anonymous letters.
+FIELD_LABELS = ["黄金收入", "总收入", "营业成本", "权利金", "公司管理费", "费用化勘探",
+                "资本开支", "复垦摊提", "租赁付款", "净利息", "实缴现金税",
+                "一次性项目", "维护保养"]
 
 META = {
     "NEM": {
         "name": "纽蒙特", "en": "Newmont Corporation", "cik": "0001164727",
-        "exchange": "NYSE: NEM（美国本土申报人）",
+        "exchange": "NYSE: NEM（美国本土申报人，US GAAP）",
         "forms": "10-Q（季度财务报表）· 10-K（年报）· 8-K 附件 EX-99.1（业绩新闻稿与经营统计表）",
-        "revenue_src": "10-Q 管理层讨论与分析「Consolidated sales:」表的 <b>Net</b> 行、Gold 列，科目原文 <b>Consolidated gold sales, net</b>。另由 Note 5 按矿山与金属拆分的收入附注独立验算，22 个季度差额均为 0。",
+        "revenue_src": "10-Q 管理层讨论「Consolidated sales:」表的 <b>Net</b> 行、Gold 列，科目原文 <b>Consolidated gold sales, net</b>。另由按矿山与金属拆分的收入附注独立验算。",
         "opcost_src": "利润表 <b>Costs applicable to sales</b>（附注声明已剔除折旧摊销与复垦），分部附注 Gold 各行加总",
         "aisc_note": "10-K/10-Q 头条为<b>共同产品</b>口径（按 GEO 牌价的相对销售价值分摊），8-K 另发<b>副产品</b>口径。2026 年起公司把指引改为副产品口径。两者差距在 2026Q1 达 66%。",
         "quirks": [
-            "分部结构在窗口内变过两次：2023Q1 从「五大地理区域」改为「按矿山」，2023Q4 并入 Newcrest 后再调整，均已追溯重述。但 2021–2022 的 10-Q 自愿披露了矿山层明细，所以矿山层面板是连续的。",
-            "现金税 2024Q1 前无季度披露。2021–2023 由 10-K 审计年度数（1,534 / 1,122 / 794 百万美元）按季度黄金收入占比分摊，逐行打 <code>CASH_TAX_ALLOCATED_FROM_FY</code> 标志。",
+            "分部结构在窗口内变过两次：2023Q1 从「五大地理区域」改为「按矿山」，2023Q4 并入 Newcrest 后再调整，均已追溯重述。",
+            "现金税 2024Q1 前无季度披露。2013–2023 由 10-K 审计年度数按季度黄金收入占比分摊，逐行打 <code>CASH_TAX_ALLOCATED_FROM_FY</code>。",
             "「归属口径」只有盎司数有，收入与成本各行<b>只有合并口径</b>，全行打 <code>ONLY_CONSOLIDATED</code>。",
             "内华达金矿（NGM）按 <b>38.5% 比例合并</b>；Barrick 则 100% 全额合并再挂少数股东权益。两家在这一点上永久不可比。",
             "白银单位在 2021 年报「千盎司」、2026 年报「百万盎司」，同一张表相差 762 倍——解析器按科目文字读单位，不用固定乘数。",
@@ -28,126 +54,231 @@ META = {
     },
     "GOLD": {
         "name": "巴里克", "en": "Barrick Mining Corporation", "cik": "0000756894",
-        "exchange": "NYSE: B（2025年5月由 GOLD 改）· TSX: ABX（外国私募发行人）",
+        "exchange": "NYSE: B（2025年5月由 GOLD 改）· TSX: ABX（外国私募发行人，IFRS）",
         "forms": "6-K 附件 EX-99.1（新闻稿）与 EX-99.2（管理层讨论 + 简明中期财务报表）· 40-F（年报）",
-        "revenue_src": "管理层讨论 <b>Revenues - as adjusted</b>（归属口径，2026Q1 = 3,607 百万美元）。另在合并口径记 Note 6 <b>Gold sales</b>（4,756）。",
-        "opcost_src": "Note 7 <b>Site operating costs</b>。注意：黄金 <b>Cost of sales</b> <u>包含</u>权利金，Site operating costs 才是不含的那行——22 个季度用恒等式验证。",
-        "aisc_note": "头条为<b>副产品</b>口径。其所谓「共同产品」经核实<b>只是把副产品抵扣加回去</b>，并未把联合成本分摊给副产品，因此<b>不可</b>与纽蒙特、自由港的真共同产品数字比较。2024Q2 后停止披露 AIC，改用 AISC 对账。",
+        "revenue_src": "管理层讨论 <b>Revenues - as adjusted</b>（归属口径）。另在合并口径记 <b>Gold sales</b> 附注行。",
+        "opcost_src": "附注 <b>Site operating costs</b>。注意：黄金 <b>Cost of sales</b> <u>包含</u>权利金，Site operating costs 才是不含的那行。",
+        "aisc_note": "头条为<b>副产品</b>口径。其所谓「共同产品」经核实<b>只是把副产品抵扣加回去</b>，并未把联合成本分摊给副产品，因此<b>不可</b>与纽蒙特比较。2024Q2 后停止披露 AIC。",
         "quirks": [
-            "报表有<b>四列</b>（本季/去年同季/本半年/去年同半年），管理层讨论的非GAAP表却是<b>五列</b>且第二列是<b>上一季</b>而非去年同季。同一份文件里「第二列」有两种含义——解析器一律按表头文字定位，绝不按列序。",
-            "Kibali（45%）与 Porgera（24.5%）<b>权益法核算</b>，收入完全不进合并报表，却<b>计入</b>公布 AISC 的归属盎司分母。因此只有已对账的归属收入口径与之自洽。",
-            "2025Q1 起 Note 7 新增「Mining and production taxes」行，是<b>从 Site operating costs 里切出来的</b>，不是从 Royalty expense。故 2025Q1 前后 royalties 单列不可比，但两者之和连续，GAIM 不受影响。",
-            "2025Q4 租赁付款为空：审计年度数 12 小于九个月数 20，倒算为 −8，不成立。公司做了重述，该格留空而非强填 0。",
-            "盎司数<b>只披露到千盎司</b>，任何每盎司指标含最多 ±0.07% 的舍入。",
+            "报表有<b>四列</b>，管理层讨论的非GAAP表却是<b>五列</b>且第二列是<b>上一季</b>而非去年同季。解析器一律按表头文字定位，绝不按列序。",
+            "Kibali（45%）与 Porgera（24.5%）<b>权益法核算</b>，收入不进合并报表，却<b>计入</b>公布 AISC 的归属盎司分母。",
+            "2013–2016 的资本开支原先取自一个无法识别口径的来源（存 137.13，现金流量表为 270）。已按现金流量表重新提取，谷底 GAIM 因此下移 7.09 个百分点。",
+            "2025Q1 起附注新增「Mining and production taxes」行，是<b>从 Site operating costs 里切出来的</b>。两者之和连续，GAIM 不受影响。",
+            "2019Q1 Randgold 合并、2019Q3 内华达金矿合资<b>两处成分断裂</b>，前端在该处断线不连。",
         ],
     },
     "AEM": {
         "name": "艾格尼可鹰", "en": "Agnico Eagle Mines Limited", "cik": "0000002809",
         "exchange": "NYSE / TSX: AEM（外国私募发行人，IFRS，美元）",
-        "forms": "6-K 两份 EX-99.1（其一为管理层讨论 + 中期财务报表，其二为新闻稿）· 40-F（年报，含 EX-99.2 审计报表、EX-99.3 年度管理层讨论）",
-        "revenue_src": "Note 14（2026）/ Note 16（2021）<b>REVENUES FROM MINING OPERATIONS</b> 按金属拆分表的 <b>Gold</b> 行。原始单位为千美元，已换算为百万美元。",
-        "opcost_src": "利润表 <b>Production costs</b>（2026，COST OF SALES 块内）/ <b>Production</b>（2021，附注声明不含摊销）",
-        "aisc_note": "同时公布副产品与「共同产品」两套，但其<b>「共同产品」同样只是把抵扣加回去</b>，成本一分未分摊给副产品、分母仍是纯黄金盎司。真正的收入加权共同产品由我们自行计算：2026Q2 为 1,511 美元/盎司，公司公布的「共同产品」1,534 高估黄金 23.6 美元/盎司。",
+        "forms": "6-K 两份 EX-99.1（管理层讨论 + 中期财务报表 / 新闻稿）· 40-F（年报）",
+        "revenue_src": "<b>REVENUES FROM MINING OPERATIONS</b> 按金属拆分表的 <b>Gold</b> 行。原始单位千美元，已换算为百万美元。",
+        "opcost_src": "利润表 <b>Production costs</b>（附注声明不含摊销）",
+        "aisc_note": "同时公布副产品与「共同产品」两套，但其<b>「共同产品」同样只是把抵扣加回去</b>，成本一分未分摊给副产品。真正的收入加权共同产品由我们自行计算。",
         "quirks": [
-            "AISC 分母是<b>产出</b>盎司而非销售盎司，全行打 <code>AISC_PER_PRODUCED</code>。22 个季度产出与销售差距均值 +0.91%、区间 −4.89%~+3.53%，<b>有符号且均值回归</b>，不能用单一系数换算。其中约六成是三个矿山实物权利金造成的定义性楔子（Canadian Malartic 5%、Detour Lake 2%、Macassa 1.5%）。",
-            "2021 年 AISC 的分母科目叫 <b>Adjusted gold production</b>（剔除试生产盎司），2022 年起改叫 <b>Gold production</b>。逐年读表头，不假设。",
-            "三次追溯重述：IAS 16 试生产收入（2021 全年收入 +1.90%）、Kirkland Lake 购买价格分摊、Yamana / Canadian Malartic 购买价格分摊。一律采用<b>最新版本</b>。",
+            "AISC 分母是<b>产出</b>盎司而非销售盎司。已按各期实际产出/销售盎司逐行重述为销售口径——<b>此前这段代码从未真正执行过</b>（判定条件读的是首行的口径字符串），修正后 36 行移动，均值 −0.56 个百分点。",
+            "2017–2020 的 16 行仍缺产出盎司分母，无法重述，逐行打 <code>AISC_PER_PRODUCED_NOT_RESTATED</code>。",
+            "三次追溯重述：IAS 16 试生产收入、Kirkland Lake 与 Yamana 购买价格分摊。一律采用<b>最新版本</b>。",
             "2022Q1 为 <b>52 天存根季度</b>（Kirkland Lake 于 2月8日并表），打 <code>STUB_QUARTER</code>，不做平滑掩盖。",
-            "同一份文件里「Total Capital Expenditures」有<b>三个不同数字</b>：现金流量表 809.3、管理层讨论 800.9（含资本化勘探）、新闻稿 699.2（不含）——相差 14%。按方法论取现金流量表口径。",
-            "复垦摊提被<b>捆在 Finance costs 里</b>，无法单列，故记 null 而非 0，避免与净利息重复计算。",
+            "同一份文件里「Total Capital Expenditures」有<b>三个不同数字</b>，相差 14%。按方法论取现金流量表口径。",
+            "复垦摊提被<b>捆在 Finance costs 里</b>，记 null 而非 0，避免与净利息重复计算。",
         ],
     },
     "KGC": {
         "name": "金罗斯", "en": "Kinross Gold Corporation", "cik": "0000701818",
         "exchange": "NYSE: KGC / TSX: K（外国私募发行人，IFRS，美元）",
         "forms": "6-K 附件 EX-99.x（新闻稿 + 管理层讨论 + 中期财务报表）· 40-F（年报）",
-        "revenue_src": "利润表 <b>Metal sales</b> 减去管理层讨论第11节的 <b>silver revenue</b>——两个已披露行相减，绝非「价格×盎司」倒推。验证：所得除以黄金销售盎司，与公司公布的平均实现金价在 22 个季度内偏差均 ≤0.036%。",
+        "revenue_src": "利润表 <b>Metal sales</b> 减去管理层讨论披露的 <b>silver revenue</b>——两个已披露行相减，绝非「价格×盎司」倒推。",
         "opcost_src": "利润表 <b>Production cost of sales</b>",
-        "aisc_note": "头条为<b>黄金当量（GEO）</b>口径，公司自己称之为 co-product accounting——这在代数上成立：按现货比价把白银折入分母，等价于按相对收入分摊联合成本（验证：486,507 + 771,000÷61.61 = 499,021 ≈ 公布的 499,035）。<b>因此金罗斯与纽蒙特是本组仅有的两家真正披露共同产品重述的公司。</b>但换算比价四个季度内从 97.41:1 摆到 57.79:1，波动 68%。",
+        "aisc_note": "头条为<b>黄金当量（GEO）</b>口径，公司称之为 co-product accounting——这在代数上成立。<b>金罗斯与纽蒙特是本组仅有的两家真正披露共同产品重述的公司。</b>但换算比价四个季度内从 97.41:1 摆到 57.79:1。",
         "quirks": [
-            "<b>无 IFRS 15 按金属拆分附注</b>，利润表只有一行 Metal sales，分部附注只按矿山拆。金/银拆分只存在于管理层讨论的非GAAP对账里，且专门的 <b>Attributable gold revenue</b> 表 2024Q4 才出现。",
-            "<code>gold_oz_produced</code> 列装的是 <b>GEO</b>——金罗斯全文未披露纯黄金产量。全行打 <code>GEO_BASIS</code>。",
-            "2022Q1–2023Q3 为<b>终止经营列报</b>：俄罗斯资产于 2022Q1 移出持续经营，Chirano 在 2022Q1 报表里<b>仍在</b>持续经营、2022Q2 才移出——<b>2022Q1 被重述了两次</b>（Metal sales 768.0 → 700.9）。2021 全年从 3,729.4 重述为 2,599.6。",
-            "Finance expense 是毛捆绑，但金罗斯<b>把它拆开了</b>，所以净利息取利息行、复垦摊提单独取，既穷尽又不重叠。",
+            "<b>无按金属拆分的收入附注</b>，金/银拆分只存在于管理层讨论的非GAAP对账里。",
+            "<code>gold_oz_produced</code> 列装的是 <b>GEO</b>——金罗斯全文未披露纯黄金产量，全行打 <code>GEO_BASIS</code>。",
+            "2022Q1–2023Q3 为<b>终止经营列报</b>：俄罗斯资产 2022Q1 移出、Chirano 2022Q2 才移出——<b>2022Q1 被重述了两次</b>。",
+            "Finance expense 虽是毛捆绑，但金罗斯<b>把它拆开了</b>，净利息与复垦摊提可分别取用，既穷尽又不重叠。",
             "白银占金属销售 0.59%–5.91%（均值 2.84%），远低于外部资料常引用的约 8%。",
-            "无单独的勘探科目——利润表行为 <b>Exploration and business development</b>，且其定义在 2022Q2–2024Q4 间漂移过。取整行并标注，宁可口径略宽也不要口径不一致。",
+        ],
+    },
+    "AU": {
+        "name": "安格鲁黄金", "en": "AngloGold Ashanti plc", "cik": "0001067428 → 0001973832",
+        "exchange": "NYSE: AU · JSE（外国私募发行人，IFRS，美元）",
+        "forms": "2013–2015：6-K 季度报告 · 2016 起：6-K <b>半年报</b>（Q1/Q3 只有产量与 AISC 的运营更新，没有成本表）· 20-F 年报",
+        "revenue_src": "利润表 <b>Revenue</b> 与分部附注的黄金收入行，合并口径（<code>ONLY_CONSOLIDATED</code>）。",
+        "opcost_src": "<b>Cost of sales</b> 附注。<b>权利金已含在其中</b>——见下。",
+        "aisc_note": "公布 AISC 为<b>归属口径且包含权益法合资企业</b>，而收入与成本是合并口径。我们自建的对账式沿用本行自己的合并口径字段，因此与公司公布值之间存在<b>两个方向相反的已知缺口</b>：（1）用全部资本开支而非维持性资本开支（推高），（2）漏掉合资企业按比例的成本与资本开支加项（压低，且实测占优）。<b>残差未做调平，按算出来的原样报告。</b>",
+        "quirks": [
+            "<b>我曾两次断言这家公司空着的权利金与复垦列在静默漏掉成本、每行值 3.9–4.6 个百分点、是面板最大的单一缺陷。这是错的。</b>派去修它的任务从 Cost of sales 附注提出了 8 个期间的真实权利金再从营业成本里减掉，GAIM 变动的行数<b>为零</b>——证明权利金本来就在营业成本里面。错因是判定「哪些字段已被别行包含」的白名单只按四家公司标定过，安格鲁与金田从来不在其中。",
+            "2016 年起停发独立季报：41 行中 13 行为<b>半年</b>观测，画在图上占六个月宽度，不拆成季度。",
+            "Obuasi 于 2015Q2 重分类为终止经营且<b>前期未重述</b>，该处强制序列断点。",
+            "Sukari 金矿按 <b>100% 合并</b>，而安格鲁只持有 50%。",
+            "2023 年迁册英国，CIK 由 1067428 变为 1973832，取数需缝合双 CIK。",
+        ],
+    },
+    "GFI": {
+        "name": "金田", "en": "Gold Fields Limited", "cik": "0001172724",
+        "exchange": "NYSE: GFI · JSE（外国私募发行人，IFRS，美元）",
+        "forms": "6-K 半年度与全年业绩公告 · 20-F 年报。<b>不发季度财务报表</b>。",
+        "revenue_src": "收入表的黄金行，<b>已扣除副产品收入</b>（<code>GOLD_REV_NET_OF_BYPRODUCT_REVENUE</code>）。",
+        "opcost_src": "<b>Cost of sales</b>，为<b>含公司管理费的总额</b>口径。",
+        "aisc_note": "AISC 与 AIC 均按 WGC 口径公布，但 H2 的每盎司数多数由「全年减上半年」倒算。Cerro Corona 用<b>黄金当量盎司</b>，内嵌一个漂移的价格比。",
+        "quirks": [
+            "<b>本组唯一的半年度申报人</b>：32 行中 20 行为半年观测。这是把整个面板的聚合频率定在半年的原因——把金田拆成季度就是方法论明令禁止的插值。",
+            "<b>公司管理费追不到出处。</b>六个数值散落三份文件，没有一处有科目标题。已从成本堆栈中撤出，另存 <code>corporate_g_and_a_unsourced</code> 列并打 <code>PROVENANCE_UNRESOLVED</code>。撤出使金田 GAIM <b>上升</b>约 1.73 个百分点——这是对我们有利的方向，故明说。",
+            "另有 21 行在一个<b>描述性</b>标志里写明营业成本是含管理费的总额，但没有任何代码读那个标志。已将其中 17 行转为机器可读的 <code>TIERAEQ:corporate_g_and_a:BUNDLED_IN_OPCOST_GROSS</code>。",
+            "2013 年两行的营业成本原为「净额」口径，重述为总额后，管理费与复垦成为<b>备查子集</b>，若再相加即双重计算，故单独存放。",
+            "公司自行披露 2018 年末现金流量表存在<b>内部控制重大缺陷</b>（成本截止日为 12月21日）。该年的资本开支与现金税取自这张报表。",
         ],
     },
 }
 
-HUE = {"NEM": ("#2a78d6", "#3987e5"), "GOLD": ("#eb6834", "#d95926"),
-       "AEM": ("#1baf7a", "#199e70"), "KGC": ("#eda100", "#c98500")}
-ORDER = ["NEM", "GOLD", "AEM", "KGC"]
-
-def quarter_range(lo, hi):
-    """Every quarter from lo to hi inclusive, including ones we have no data for."""
-    out, y, k = [], int(lo[:4]), int(lo[5])
-    while (y, k) <= (int(hi[:4]), int(hi[5])):
-        out.append(f"{y}Q{k}")
-        y, k = (y + 1, 1) if k == 4 else (y, k + 1)
-    return out
+HUE = {"NEM": ("#2a78d6", "#4b95ea"), "GOLD": ("#eb6834", "#f5804f"),
+       "AEM": ("#1baf7a", "#2fc78f"), "KGC": ("#eda100", "#f2b62e"),
+       "AU": ("#8d54c9", "#a679dd"), "GFI": ("#c2334f", "#dc5570")}
+ORDER = ["NEM", "GOLD", "AEM", "AU", "KGC", "GFI"]
+# Short display name: "Gold Fields Limited".split()[0] is "Gold", which is not a
+# company. Spell them out rather than deriving them.
+SHORT = {'NEM': 'Newmont', 'GOLD': 'Barrick', 'AEM': 'Agnico Eagle', 'KGC': 'Kinross', 'AU': 'AngloGold Ashanti', 'GFI': 'Gold Fields'}
 
 
-observed = sorted(q.quarter.unique())
-# The axis carries the UNOBSERVED quarters too. 2017-2020 was never fetched, and
-# if the axis simply skipped it, 2016Q4 would sit against 2021Q1 and the chart
-# would draw a continuous line across a four-year hole -- inventing a recovery
-# path nobody measured. The gap has to occupy its true width and be labelled.
-quarters = quarter_range(observed[0], observed[-1])
-missing = [x for x in quarters if x not in set(observed)]
-years = list(range(int(a.year.min()), int(a.year.max()) + 1))
+def span(period):
+    """(x0, x1) in months since EPOCH-01. Q spans 3 months, H spans 6."""
+    year, kind, n = int(period[:4]), period[4], int(period[5:])
+    width = 3 if kind == "Q" else 6
+    x0 = (year - EPOCH) * 12 + (n - 1) * width
+    return x0, x0 + width
 
 
-def col(g, idx, key, keys):
-    m = g.set_index(key)
-    return [None if idx_v not in m.index or pd.isna(m[keys].get(idx_v)) else round(float(m[keys].get(idx_v)), 2)
-            for idx_v in idx]
+def half_of(period):
+    year, kind, n = int(period[:4]), period[4], int(period[5:])
+    return f"{year}H{n if kind == 'H' else (1 if n <= 2 else 2)}"
 
+
+def num(v, nd=2):
+    return None if pd.isna(v) else round(float(v), nd)
+
+
+# --- invariant: the label's implied span must equal the row's own month count.
+bad = [(r.ticker, r.quarter) for r in q.itertuples()
+       if (span(r.quarter)[1] - span(r.quarter)[0]) != int(r.months)]
+if bad:
+    raise SystemExit(f"period label disagrees with months column: {bad[:5]}")
+
+q = q.assign(half=q.quarter.map(half_of))
+# --- invariant: every (ticker, half) bucket must hold exactly six months, or a
+# company contributing one quarter would be weighted against another's full half.
+short = q.groupby(["ticker", "half"]).months.sum()
+short = short[short != 6]
+if len(short):
+    raise SystemExit(f"half-year buckets are not 6 months: {short.to_dict()}")
+
+halves = sorted(q.half.unique(), key=lambda h: (int(h[:4]), int(h[5])))
+audit_by_period = audit.set_index("quarter")
 
 series = []
 for t in ORDER:
-    gq, ga = q[q.ticker == t], a[a.ticker == t]
+    g = q[q.ticker == t].copy()
+    ga = a[a.ticker == t]
     m = META[t]
+    obs = []
+    for r in g.itertuples():
+        x0, x1 = span(r.quarter)
+        flags = str(getattr(r, "flags", "") or "")
+        obs.append({
+            "p": r.quarter, "h": r.half, "x0": x0, "x1": x1, "f": r.freq,
+            "l1": num(r.L1), "l2": num(r.L2), "l0a": num(r.L0a),
+            "l0b": num(r.L0b), "l0badj": num(r.L0b_adj), "aisc": num(r.aisc_margin),
+            "grade": r.fidelity_grade, "vec": r.fidelity_vector,
+            "bias": num(r.bias_pt_central), "biasLo": num(r.bias_pt_lo),
+            "biasHi": num(r.bias_pt_hi),
+            "out": bool(r.is_outlier), "hl": bool(r.in_headline_aggregate),
+            # SERIES_BREAK means "do not connect this point to the previous one":
+            # the entity or the basis changed underneath the series.
+            "brk": "SERIES_BREAK" in flags,
+            "rev": num(r.gold_revenue, 1), "cost": num(r.gold_cost_total, 1),
+            "ni": num(r.net_income_attributable, 1), "trev": num(r.total_revenue, 1),
+            "oz": None if pd.isna(r.gold_oz_sold) else int(r.gold_oz_sold),
+            "price": num(r.realised_price, 0), "aiscUsd": num(r.aisc_comparable, 0),
+            "imp": num(r.impairment_charges, 1),
+        })
     series.append({
-        "id": t, "name": m["name"], "en": m["en"], "light": HUE[t][0], "dark": HUE[t][1],
+        "id": t, "name": m["name"], "en": m["en"], "short": SHORT[t],
+        "light": HUE[t][0], "dark": HUE[t][1],
         "cik": m["cik"], "exchange": m["exchange"], "forms": m["forms"],
         "revenueSrc": m["revenue_src"], "opcostSrc": m["opcost_src"],
         "aiscNote": m["aisc_note"], "quirks": m["quirks"],
-        "l1": col(gq, quarters, "quarter", "L1"), "l2": col(gq, quarters, "quarter", "L2"),
-        # revenue and cost totals let the page re-aggregate any company subset
-        "rev": col(gq, quarters, "quarter", "gold_revenue"),
-        "cost": col(gq, quarters, "quarter", "gold_cost_total"),
-        "aiscUsd": col(gq, quarters, "quarter", "aisc_comparable"),
-        "oz": [None if pd.isna(v) else int(v) for v in
-               (gq.set_index("quarter").gold_oz_sold.reindex(quarters))],
-        "aRev": col(ga, years, "year", "gold_revenue"),
-        "l0": col(gq, quarters, "quarter", "L0a"), "aisc": col(gq, quarters, "quarter", "aisc_margin"),
-        "l0b": col(gq, quarters, "quarter", "L0b"),
-        # net income and total revenue so the page can aggregate L0b the same way
-        # it aggregates GAIM -- sum the parts, divide once
-        "ni": col(gq, quarters, "quarter", "net_income_attributable"),
-        "trev": col(gq, quarters, "quarter", "total_revenue"),
-        "price": col(gq, quarters, "quarter", "realised_price"),
-        "aL1": col(ga, years, "year", "L1"), "aL0": col(ga, years, "year", "L0a"),
-        "aAisc": col(ga, years, "year", "aisc_margin"), "aPrice": col(ga, years, "year", "realised_price"),
-        "meanGaim": round(gq.L1.mean(), 1), "meanAisc": round(gq.aisc_margin.mean(), 1),
-        "gap": round((gq.aisc_margin - gq.L1).mean(), 1),
-        "residMean": round(gq.recon_residual_pct.abs().mean(), 3),
-        "residMax": round(gq.recon_residual_pct.abs().max(), 3),
+        "obs": obs,
+        "freqMix": {k: int(v) for k, v in g.freq.value_counts().items()},
+        "grades": {k: int(v) for k, v in g.fidelity_grade.value_counts().items()},
+        "meanGaim": round(g.L1.mean(), 1), "meanAisc": round(g.aisc_margin.mean(), 1),
+        "gap": round((g.aisc_margin - g.L1).mean(), 1),
+        "years": [int(y) for y in ga.year],
+        "aL1": [num(v) for v in ga.L1], "aL0": [num(v) for v in ga.L0a],
+        "aAisc": [num(v) for v in ga.aisc_margin],
+        "aPrice": [num(v, 0) for v in ga.realised_price],
+        "aComplete": [bool(v) for v in ga.complete],
     })
 
+# Censoring strip, one entry per reporting period actually present in the panel.
+strip = []
+for p in sorted(q.quarter.unique(), key=lambda s: span(s)[0]):
+    row = audit_by_period.loc[p] if p in audit_by_period.index else None
+    x0, x1 = span(p)
+    strip.append({
+        "p": p, "x0": x0, "x1": x1,
+        "n": int(row.companies_covered) if row is not None else 0,
+        "ex": int(row.companies_excluded) if row is not None else 0,
+        "exT": None if row is None or pd.isna(row.excluded_tickers) else row.excluded_tickers,
+        "distress": bool(row.sector_distress_diagnostic) if row is not None else False,
+        "breach": int(row.companies_breaching_aisc_cap) if row is not None else 0,
+    })
+
+kept = q[~q.is_outlier]
+eras = []
+for lo, hi, label in [(2013, 2016, "2013–2016 谷底"), (2017, 2020, "2017–2020 复苏"),
+                      (2021, 2026, "2021–2026 牛市")]:
+    e = kept[(kept.quarter.str[:4].astype(int) >= lo) & (kept.quarter.str[:4].astype(int) <= hi)]
+    gaim = (e.gold_revenue - e.gold_cost_total).sum() / e.gold_revenue.sum() * 100
+    aisc = (e.aisc_margin * e.gold_revenue).sum() / e.gold_revenue.sum()
+    eras.append({"label": label, "lo": lo, "hi": hi, "n": len(e),
+                 "gaim": round(gaim, 2), "aisc": round(aisc, 2),
+                 "gap": round(aisc - gaim, 1)})
+
 payload = {
-    "quarters": quarters, "years": [int(y) for y in years], "series": series,
-    "missing": missing, "observed": observed,
-    "partialYear": int(a[~a.complete].year.max()) if (~a.complete).any() else None,
-    "missingYears": [y for y in range(min(years), max(years) + 1) if y not in set(years)],
+    "epoch": EPOCH,
+    "xmax": max(span(p)[1] for p in q.quarter),
+    "halves": halves, "aggMinPanel": AGG_MIN_PANEL,
+    "series": series, "strip": strip, "eras": eras,
+    "fieldLabels": FIELD_LABELS,
+    "n": len(q), "nCo": q.ticker.nunique(), "nPeriods": q.quarter.nunique(),
+    "first": min(q.quarter, key=lambda s: span(s)[0]),
+    "last": max(q.quarter, key=lambda s: span(s)[0]),
+    "nOutlier": int(q.is_outlier.sum()),
+    "gradeCounts": {k: int(v) for k, v in q.fidelity_grade.value_counts().items()},
+    "nAB": int(q.fidelity_grade.isin(["A", "B"]).sum()),
+    "biasMean": round(q.bias_pt_central.mean(), 2),
+    "biasMax": round(q.bias_pt_central.max(), 2),
+    # L0b_adj differs from L0b on 5 rows. The column exists; the extraction
+    # behind it does not, and a chart that draws the two as separate layers
+    # would claim an impairment-stripping pass nobody has run.
+    "nAdj": int((q.L0b_adj - q.L0b).abs().gt(1e-9).sum()),
     "meanGap": round((q.aisc_margin - q.L1).mean(), 1),
-    "meanAisc": round(q.aisc_margin.mean(), 1), "meanGaim": round(q.L1.mean(), 1),
-    "n": len(q), "nCo": q.ticker.nunique(),
 }
 (ROOT / "charts").mkdir(exist_ok=True)
-(ROOT / "charts/data.json").write_text(json.dumps(payload, ensure_ascii=False))
-print(f"axis quarters {len(quarters)} ({len(observed)} observed, {len(missing)} unfetched)  "
-      f"years {len(years)}  series {len(series)}  "
-      f"partial year {payload['partialYear']}  mean gap {payload['meanGap']}")
-print(f"unfetched span: {missing[0]}..{missing[-1]}" if missing else "no gap")
+blob = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+(ROOT / "charts/data.json").write_text(blob)
+
+# The page is a single self-contained file: src/page.html is the template, the
+# payload is inlined at build time. Keeping the template separate is what makes
+# the build re-runnable -- inlining into the source would consume the
+# placeholder and the next run would have nothing to substitute.
+tpl = (ROOT / "src/page.html").read_text()
+if tpl.count("__DATA__") != 1:
+    raise SystemExit(f"src/page.html has {tpl.count('__DATA__')} placeholders, expected 1")
+(ROOT / "charts/gold_margins.html").write_text(tpl.replace("__DATA__", blob))
+print(f"series {len(series)}  observations {payload['n']}  "
+      f"periods {payload['nPeriods']} ({payload['first']}..{payload['last']})  "
+      f"aggregate buckets {len(halves)} half-years")
+print(f"grades {payload['gradeCounts']}  A/B rows {payload['nAB']}  "
+      f"outliers {payload['nOutlier']}  bias mean {payload['biasMean']}pt")
+for e in eras:
+    print(f"  {e['label']}  n={e['n']:3d}  GAIM {e['gaim']:6.2f}%  "
+          f"AISC {e['aisc']:6.2f}%  gap {e['gap']:.1f}pt")
