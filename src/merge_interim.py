@@ -66,7 +66,7 @@ from pathlib import Path
 INTERIM = Path(__file__).resolve().parent.parent / "data" / "interim"
 
 ERA_RE = re.compile(r"^([A-Z]+)_(\d{4})_(\d{4})\.csv$")
-CANON_SUFFIXES = ("_quarterly.csv", "_halfyearly.csv", "_mixed.csv")
+CANON_SUFFIXES = ("_quarterly.csv", "_halfyearly.csv", "_mixed.csv", "_annual.csv")
 
 # Fields excluded from the conflict test: they are provenance and bookkeeping,
 # not claims about the world. Two agents citing different (both valid) source
@@ -75,15 +75,27 @@ PROVENANCE_FIELDS = {"source_file"}
 
 
 def period_freq(period: str) -> str:
-    """'2021Q3' -> 'Q'; '2021H1' -> 'H'."""
-    return "H" if "H" in str(period)[4:] else "Q"
+    """'2021Q3' -> 'Q'; '2021H1' -> 'H'; '2005FY' -> 'A'.
+
+    Must agree with build_series.period_freq. It did not: both read '2005FY'
+    as 'Q' (no 'H' in 'FY') and then died in period_start_month on int('Y').
+    Kinross filed nothing interim in 2005, so its only figures are the audited
+    annuals -- a real row this pipeline has to carry, not an edge case.
+    """
+    tail = str(period)[4:]
+    if tail.upper().startswith(("FY", "A")):
+        return "A"
+    return "H" if "H" in tail else "Q"
 
 
 def period_start_month(period: str) -> int:
-    """First month of the period, 1-12. Q3 -> 7; H2 -> 7."""
+    """First month of the period, 1-12. Q3 -> 7; H2 -> 7; FY -> 1."""
     p = str(period)
+    f = period_freq(p)
+    if f == "A":
+        return 1
     n = int(p[5])
-    return (n - 1) * 6 + 1 if period_freq(p) == "H" else (n - 1) * 3 + 1
+    return (n - 1) * 6 + 1 if f == "H" else (n - 1) * 3 + 1
 
 
 def period_order(period: str) -> int:
@@ -203,8 +215,13 @@ def merge_ticker(ticker: str, era_files: list[Path], prefer: str | None,
         for c in header:
             r.setdefault(c, "")
     freqs = {period_freq(r["quarter"]) for r in merged}
+    # Annual rows count as a frequency. Without the explicit 'A' arm a set of
+    # {"A"} alone fell through to "_halfyearly.csv" -- a filename asserting a
+    # frequency the file does not contain, which is exactly the drift failure
+    # mode 3 in the docstring exists to prevent.
     suffix = ("_mixed.csv" if len(freqs) > 1
-              else "_quarterly.csv" if freqs == {"Q"} else "_halfyearly.csv")
+              else "_quarterly.csv" if freqs == {"Q"}
+              else "_halfyearly.csv" if freqs == {"H"} else "_annual.csv")
     target = INTERIM / f"{ticker}{suffix}"
 
     span = f"{merged[0]['quarter']}..{merged[-1]['quarter']}" if merged else "-"

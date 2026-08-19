@@ -894,7 +894,8 @@ def main():
     # "_quarterly" would bury that in a flag nobody reads.
     files = sorted(list(INTERIM.glob("*_quarterly.csv"))
                    + list(INTERIM.glob("*_halfyearly.csv"))
-                   + list(INTERIM.glob("*_mixed.csv")))
+                   + list(INTERIM.glob("*_mixed.csv"))
+                   + list(INTERIM.glob("*_annual.csv")))
     if not files:
         raise SystemExit("no extracted company files in data/interim/")
 
