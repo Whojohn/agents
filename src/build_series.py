@@ -310,7 +310,20 @@ def load_company(path):
     # depends on. Derived here from the two figures themselves, so the gate is
     # evaluable and the units are one thing.
     if "recon_aisc" in d:
-        d["recon_residual_calc"] = (d.recon_aisc - d.published_aisc) / d.published_aisc * 100
+        # Which published figure the reconstruction was built against is a
+        # property of the extraction, not of the company, so it is read per row
+        # rather than assumed. Gold Fields reconciles to AIC because its
+        # capex_total is TOTAL capex -- AIC's scope -- while AISC counts
+        # sustaining capex only. Scoring it against AISC reports 9.4% where the
+        # real residual is 5.1%, and would trip the gate on a basis mismatch
+        # that is not an extraction error. Defaulting to AISC keeps every
+        # existing row's meaning unchanged.
+        basis_col = (d.recon_basis.astype(str).str.upper() if "recon_basis" in d
+                     else pd.Series("AISC", index=d.index))
+        ref = d.published_aisc.where(basis_col != "AIC",
+                                     d.published_aic if "published_aic" in d else d.published_aisc)
+        d["recon_basis_used"] = basis_col.where(ref.notna(), None)
+        d["recon_residual_calc"] = (d.recon_aisc - ref) / ref * 100
     d["aisc_comparable"], d["aisc_basis_note"] = aisc, basis
     d["aisc_margin"] = (1 - aisc / d.realised_price) * 100
     d["gold_revenue"] = rev
@@ -719,7 +732,7 @@ def main():
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
             "panel_n_q", "L2_months", "months", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",
-            "recon_residual_pct", "recon_residual_calc",
+            "recon_residual_pct", "recon_residual_calc", "recon_basis_used",
             "fidelity_vector", "fidelity_grade", "bias_pt_central",
             "bias_pt_lo", "bias_pt_hi", "bias_price_ref",
             "in_headline_aggregate", "bias_note", "flags"]
