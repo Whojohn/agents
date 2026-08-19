@@ -110,6 +110,8 @@ SMOOTH_WINDOW = 4       # trailing quarters averaged
 # of the floor is the first two quarters of every company; the cost of not having
 # it falls entirely on troughs, which is where the series has to be right.
 SMOOTH_MIN_PERIODS = 3
+SMOOTH_MONTHS = 12          # the window, in months
+SMOOTH_MIN_MONTHS = 9       # ...and the minimum real coverage inside it
 
 
 # Periods per year, by reporting frequency. Gold Fields publishes financial
@@ -118,6 +120,13 @@ SMOOTH_MIN_PERIODS = 3
 # forbids splitting a half, and interpolating one would manufacture a quarterly
 # cycle that was never reported.
 PERIODS_PER_YEAR = {"Q": 4, "H": 2}
+PERIOD_MONTHS = {"Q": 3, "H": 6}
+
+# AngloGold is not one frequency or the other -- it reported half-yearly through
+# 2022, quarterly in 2021Q1-Q2 and again from 2023. So frequency cannot be a
+# property of a COMPANY; it is a property of a ROW. Everything below therefore
+# works in months rather than in period counts, which is the only unit both
+# frequencies share.
 
 
 def period_freq(period):
@@ -125,11 +134,27 @@ def period_freq(period):
     return "H" if "H" in str(period)[4:] else "Q"
 
 
+def period_start_month(period):
+    """First month of the period, 1-12. Q3 -> 7; H2 -> 7."""
+    p, n = str(period), int(str(period)[5])
+    return (n - 1) * 6 + 1 if period_freq(p) == "H" else (n - 1) * 3 + 1
+
+
+def period_order(period):
+    """Chronological sort key. Plain string sorting puts 2021H2 BEFORE 2021Q1,
+    because 'H' < 'Q' in ASCII -- which silently reverses a company's own
+    history in any window function that trusts the row order."""
+    return int(str(period)[:4]) * 100 + period_start_month(period)
+
+
 def load_company(path):
     ticker = path.stem.split("_")[0]
-    d = pd.read_csv(path).sort_values("quarter").reset_index(drop=True)
+    d = pd.read_csv(path)
     d["ticker"], d["year"] = ticker, d.quarter.str[:4].astype(int)
     d["freq"] = d.quarter.map(period_freq)
+    d["months"] = d.freq.map(PERIOD_MONTHS)
+    d["_ord"] = d.quarter.map(period_order)
+    d = d.sort_values("_ord").reset_index(drop=True)
 
     for year, fy_total in ANNUAL_CASH_TAX.get(ticker, {}).items():
         gap = (d.year == year) & d.cash_tax_paid.isna()
@@ -278,18 +303,33 @@ def add_smoothed(d):
     L2_n records how many quarters actually went into each average, so a reader
     can see when a "four-quarter" figure rests on three.
     """
-    d = d.sort_values("quarter")
-    # The window is one YEAR, not four rows. For a half-yearly filer four rows
-    # would be a two-year average -- a different amount of smoothing applied to
-    # one member of the panel, which is not a detail when the whole point of the
-    # smoothed line is comparability across companies.
-    freq = d.freq.iloc[0]
-    win = PERIODS_PER_YEAR[freq]
-    min_p = SMOOTH_MIN_PERIODS if freq == "Q" else max(2, win - 1)
-    d["L2"] = (d.L1.where(~d.is_outlier)
-               .rolling(win, min_periods=min_p).mean())
-    d["L2_n"] = (d.L1.where(~d.is_outlier)
-                 .rolling(win, min_periods=1).count())
+    d = d.sort_values("_ord")
+    # The window is twelve MONTHS, weighted by how much of the year each period
+    # covers -- not a fixed number of rows. Four rows is a year for a quarterly
+    # filer and two years for a half-yearly one, and AngloGold is both inside a
+    # single series. For a purely quarterly company this reduces exactly to the
+    # old trailing four-quarter simple mean, since every period then weighs 3.
+    vals = d.L1.where(~d.is_outlier).to_numpy()
+    mons, ends = d.months.to_numpy(), d._ord.to_numpy()
+    L2, L2_n, L2_m = [], [], []
+    for i in range(len(d)):
+        num = den = cov = n = 0.0
+        for j in range(i, -1, -1):
+            if cov + mons[j] > SMOOTH_MONTHS:
+                break
+            cov += mons[j]
+            if not pd.isna(vals[j]):
+                num += vals[j] * mons[j]; den += mons[j]; n += 1
+        L2.append(num / den if den else float("nan"))
+        L2_n.append(n)
+        # den, not cov: months of REAL data behind the average. Counting the
+        # window's span instead would let an average built from two surviving
+        # quarters publish itself as a twelve-month figure -- which is the
+        # survivor-smoothing this gate exists to stop.
+        L2_m.append(den)
+    d["L2"] = L2
+    d["L2_n"], d["L2_months"] = L2_n, L2_m
+    d.loc[d.L2_months < SMOOTH_MIN_MONTHS, "L2"] = float("nan")
     return d
 
 
@@ -319,7 +359,8 @@ def censoring_audit(panel):
             "breaching_tickers": ";".join(sorted(breached.ticker)),
             "sector_distress_diagnostic": bool(g.sector_distress.iloc[0]),
         })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows).assign(
+        _ord=lambda x: x.quarter.map(period_order)).sort_values("_ord").drop(columns="_ord")
 
 
 def build_annual(frames):
@@ -340,11 +381,12 @@ def build_annual(frames):
             group_cost = g.reindex(columns=GROUP_COSTS).fillna(0).sum().sum() * w
             # ounce-weighted AISC: total AISC dollars over total ounces
             aisc_usd = (g.aisc_comparable * g.gold_oz_sold).sum() / 1e6
-            freq = g.freq.iloc[0]
+            freq = "/".join(sorted(g.freq.unique()))
             rows.append({
                 "ticker": d.ticker.iloc[0], "year": year, "periods": len(g),
                 "freq": freq,
-                "complete": len(g) == PERIODS_PER_YEAR[freq],
+                "months": int(g.months.sum()),
+                "complete": int(g.months.sum()) == 12,
                 "gold_revenue": round(rev, 1), "gold_oz_sold": int(oz),
                 "realised_price": round(price_rev / oz * 1e6, 0),
                 "L0a": round((rev - site - g.segment_dda.fillna(0).sum()) / rev * 100, 2),
@@ -361,7 +403,8 @@ def main():
     # publishes financial statements half-yearly only; calling its file
     # "_quarterly" would bury that in a flag nobody reads.
     files = sorted(list(INTERIM.glob("*_quarterly.csv"))
-                   + list(INTERIM.glob("*_halfyearly.csv")))
+                   + list(INTERIM.glob("*_halfyearly.csv"))
+                   + list(INTERIM.glob("*_mixed.csv")))
     if not files:
         raise SystemExit("no extracted company files in data/interim/")
 
@@ -374,10 +417,14 @@ def main():
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
             "net_income_attributable", "impairment_charges",
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
-            "panel_n_q", "sector_distress", "sector_breach_share",
+            "panel_n_q", "L2_months", "months", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",
             "recon_residual_pct", "flags"]
-    out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
+    # Sort on the chronological key, NOT on the period string -- 'H' < 'Q' would
+    # put 2021H2 ahead of 2021Q1 and hand every downstream consumer a series that
+    # runs backwards through its own mixed-frequency years.
+    out = (pd.concat(frames).sort_values(["ticker", "_ord"])
+           .reindex(columns=cols))
     out.to_csv(FINAL / "margins.csv", index=False)
     annual = build_annual(frames)
     annual.to_csv(FINAL / "margins_annual.csv", index=False)
