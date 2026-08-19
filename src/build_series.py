@@ -120,13 +120,21 @@ def load_company(path):
     #            is the gross interest expense, before the capitalisation credit.
     #   Kinross  OMITS it: it sits in a separate cash-flow investing line that feeds
     #            neither column.
+    # ...but the convention is not stable over time, so it cannot be keyed on the
+    # ticker alone. Kinross INCLUDES capitalised interest inside capex in 2013-2016
+    # and EXCLUDES it in 2021-2026; applying the modern correction to the old rows
+    # would double-count it. An extraction agent that knows this signals it on the
+    # row, and the row wins over the per-company default -- data that describes its
+    # own convention beats a rule that has to guess the era.
     if "capitalised_interest" in d:
         ci = d.capitalised_interest.fillna(0)
+        already_in_capex = d["flags"].fillna("").str.contains("CAPINT_INCLUDED_IN_CAPEX")
         if ticker == "GOLD":
             d["net_interest"] = d.net_interest - ci          # remove the double count
             d["flags"] = d["flags"].fillna("") + ";CAPINT_DEDUPED"
         elif ticker == "KGC":
-            d["capex_total"] = d.capex_total + ci            # fill the gap
+            add = ci.where(~already_in_capex, 0)             # fill the gap, once
+            d["capex_total"] = d.capex_total + add
             d["flags"] = d["flags"].fillna("") + ";CAPINT_ADDED"
 
     gaim_col, price_col = REVENUE_BASIS.get(ticker, DEFAULT_BASIS)
