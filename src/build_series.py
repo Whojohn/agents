@@ -335,6 +335,31 @@ def load_company(path):
             d.loc[miss, "flags"] = d.loc[miss, "flags"].fillna("") + ";CHECKSUM_OUTSIDE_GATE"
     d["aisc_comparable"], d["aisc_basis_note"] = aisc, basis
     d["aisc_margin"] = (1 - aisc / d.realised_price) * 100
+
+    # AngloGold's published AISC is denominated on ATTRIBUTABLE ounces including
+    # equity-accounted joint ventures; our gold revenue is CONSOLIDATED and
+    # excludes them. Source, 2014-Q4 6-K (d878132d6k.htm): income statement
+    # "Gold income 1,278" with the segment note "Equity-accounted investments
+    # included above (142)", against the AISC appendix's "Attributable gold
+    # income including realised non-hedge derivatives 1,407" over "Attributable
+    # gold sold - oz (000) 1,171". 1,278/1.171m = $1,091 against the company's
+    # own "Price received per unit" of $1,202.
+    #
+    # So aisc_margin = 1 - AISC/price divides an attributable AISC by a
+    # consolidated price and understates the margin by 4.9 to 23.8 points. The
+    # right denominator -- attributable gold income -- is disclosed but not yet
+    # extracted, so the column is WITHHELD rather than published wrong. Ends at
+    # 2023Q1, where AngloGold's own basis change makes the two agree (2025Q1:
+    # 1,927/670k = $2,876 against a published $2,875).
+    #
+    # This also explains the panel's only "AISC margin > GAIM" violation, AU
+    # 2016H2: not rounding noise, an artefact of the understated price.
+    if d.ticker.iloc[0] == "AU":
+        bad = d._ord < period_order("2023Q1")
+        if bad.any():
+            d.loc[bad, "aisc_margin"] = pd.NA
+            d.loc[bad, "flags"] = (d.loc[bad, "flags"].fillna("")
+                + ";AISC_MARGIN_WITHHELD:PRICE_BASIS_MISMATCH_CONSOL_REV_VS_ATTRIB_OZ")
     d["gold_revenue"] = rev
     d["gold_cost_total"] = site_cost + group_cost   # lets the page re-aggregate any subset
     return d
@@ -712,7 +737,16 @@ def build_annual(frames):
             w = min(rev / g.total_revenue.sum(), 1.0)
             group_cost = g.reindex(columns=GROUP_COSTS).fillna(0).sum().sum() * w
             # ounce-weighted AISC: total AISC dollars over total ounces
-            aisc_usd = (g.aisc_comparable * g.gold_oz_sold).sum() / 1e6
+            # AISC-covered subset. The numerator can only sum periods that HAVE
+            # an AISC, so the denominator must be the same periods. Dividing an
+            # AISC covering one quarter by a full year of revenue printed
+            # AngloGold 2018 as a 56.7% AISC margin when the covered period's
+            # own figure is 12.5% -- a 44-point overstatement, on six annual
+            # rows. Where coverage is partial the year is reported with an
+            # explicit aisc_periods count rather than silently blended.
+            cov = g[g.aisc_comparable.notna() & g.gold_oz_sold.notna()]
+            aisc_usd = (cov.aisc_comparable * cov.gold_oz_sold).sum() / 1e6
+            aisc_rev = (cov.realised_price * cov.gold_oz_sold).sum() / 1e6
             freq = "/".join(sorted(g.freq.unique()))
             rows.append({
                 "ticker": d.ticker.iloc[0], "year": year, "periods": len(g),
@@ -723,8 +757,11 @@ def build_annual(frames):
                 "realised_price": round(price_rev / oz * 1e6, 0),
                 "L0a": round((rev - site - g.segment_dda.fillna(0).sum()) / rev * 100, 2),
                 "L1": round((rev - site - group_cost) / rev * 100, 2),
-                "aisc_margin": round((1 - aisc_usd / price_rev) * 100, 2),
-                "aisc_weighted": round(aisc_usd * 1e6 / oz, 0),
+                "aisc_margin": (None if not len(cov) or not aisc_rev
+                                else round((1 - aisc_usd / aisc_rev) * 100, 2)),
+                "aisc_periods": int(len(cov)), "aisc_all_periods": len(cov) == len(g),
+                "aisc_weighted": (None if not len(cov)
+                                  else round(aisc_usd * 1e6 / cov.gold_oz_sold.sum(), 0)),
             })
     return pd.DataFrame(rows)
 

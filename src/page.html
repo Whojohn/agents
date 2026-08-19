@@ -156,7 +156,7 @@
   <p class="note" id="l0bNote"></p>
 
   <h2>三、三个时代</h2>
-  <p class="note">按黄金收入加权、已剔除离群观测。同一行的三个数字用<b>同一个分母</b>——此前这张表的行数取自全样本、GAIM 取自剔除后加权、AISC 取自剔除后<b>不加权</b>，一行里三种口径，已改正。</p>
+  <p class="note">按黄金收入加权，已剔除离群观测，<b>并已剔除 X 级（不可发布）观测</b>——此前 <code>in_headline_aggregate</code> 是一个没有任何代码读取的列，22 个规则判定不可发布的观测一直坐在头条数字里。AISC 一列<b>只对确实有 AISC 的收入加权</b>：把没有 AISC 的收入留在分母，等于把那些期间当成 AISC 利润率为零。「其中有 AISC」一列就是这个覆盖差——2013–2022 的安格鲁黄金整段被撤回（见下方该公司条目），是缺口的主要来源。</p>
   <div class="scroll"><table id="eraTbl"></table></div>
 
   <h2>四、逐公司</h2>
@@ -223,7 +223,12 @@ function aggregate() {
       b.co.add(s.id);
       if (o.rev != null) { b.rev += o.rev; if (o.cost != null) b.cost += o.cost; }
       if (o.ni != null && o.trev != null) { b.ni += o.ni; b.trev += o.trev; }
-      if (o.aiscUsd != null && o.oz != null) { b.aiscUsd += o.aiscUsd * o.oz / 1e6; b.aiscOz += o.rev; }
+      // Denominator must be price x ounces, NOT o.rev: for Barrick o.rev is
+      // consolidated while o.oz is attributable, so using it inflated the
+      // denominator, shrank the AISC cost share and drew the AISC-GAIM gap
+      // 1.0-5.5 points too wide in every half-year.
+      if (o.aiscUsd != null && o.oz != null && o.price != null) {
+        b.aiscUsd += o.aiscUsd * o.oz / 1e6; b.aiscOz += o.price * o.oz / 1e6; }
       if (o.rev != null) { b.bias += (o.bias || 0) * o.rev; b.biasHi += (o.biasHi || 0) * o.rev; }
     }
   }
@@ -603,8 +608,11 @@ function renderStatic() {
     绝不按「价格×盎司」倒推。`;
 
   const e = document.getElementById('eraTbl');
-  e.innerHTML = '<thead><tr><th>时代</th><th>观测数</th><th>GAIM</th><th>AISC 利润率</th><th>差</th></tr></thead><tbody>'
-    + D.eras.map(r => `<tr><td>${r.label}</td><td>${r.n}</td><td>${r.gaim.toFixed(2)}%</td>`
+  e.innerHTML = '<thead><tr><th>时代</th><th>观测数</th><th>其中有 AISC</th><th>GAIM</th>'
+    + '<th>AISC 利润率</th><th>差</th></tr></thead><tbody>'
+    + D.eras.map(r => `<tr><td>${r.label}</td><td>${r.n}</td>`
+      + `<td>${r.n_aisc}${r.n_aisc < r.n ? ` <span style="color:var(--warn)">(${r.n - r.n_aisc} 无)</span>` : ''}</td>`
+      + `<td>${r.gaim.toFixed(2)}%</td>`
       + `<td>${r.aisc.toFixed(2)}%</td><td>${r.gap.toFixed(1)}pt</td></tr>`).join('') + '</tbody>';
 
   const counts = Object.entries(D.gradeCounts).sort().map(([k, v]) => `${k} 级 ${v} 行`).join(' · ');

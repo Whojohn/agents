@@ -76,7 +76,7 @@ META = {
         "aisc_note": "同时公布副产品与「共同产品」两套，但其<b>「共同产品」同样只是把抵扣加回去</b>，成本一分未分摊给副产品。真正的收入加权共同产品由我们自行计算。",
         "quirks": [
             "AISC 分母是<b>产出</b>盎司而非销售盎司。已按各期实际产出/销售盎司逐行重述为销售口径——<b>此前这段代码从未真正执行过</b>（判定条件读的是首行的口径字符串），修正后 36 行移动，均值 −0.56 个百分点。",
-            "2017–2020 的 16 行仍缺产出盎司分母，无法重述，逐行打 <code>AISC_PER_PRODUCED_NOT_RESTATED</code>。",
+
             "三次追溯重述：IAS 16 试生产收入、Kirkland Lake 与 Yamana 购买价格分摊。一律采用<b>最新版本</b>。",
             "2022Q1 为 <b>52 天存根季度</b>（Kirkland Lake 于 2月8日并表），打 <code>STUB_QUARTER</code>，不做平滑掩盖。",
             "同一份文件里「Total Capital Expenditures」有<b>三个不同数字</b>，相差 14%。按方法论取现金流量表口径。",
@@ -104,7 +104,7 @@ META = {
         "forms": "2013–2015：6-K 季度报告 · 2016 起：6-K <b>半年报</b>（Q1/Q3 只有产量与 AISC 的运营更新，没有成本表）· 20-F 年报",
         "revenue_src": "利润表 <b>Revenue</b> 与分部附注的黄金收入行，合并口径（<code>ONLY_CONSOLIDATED</code>）。",
         "opcost_src": "<b>Cost of sales</b> 附注。<b>权利金已含在其中</b>——见下。",
-        "aisc_note": "公布 AISC 为<b>归属口径且包含权益法合资企业</b>，而收入与成本是合并口径。我们自建的对账式沿用本行自己的合并口径字段，因此与公司公布值之间存在<b>两个方向相反的已知缺口</b>：（1）用全部资本开支而非维持性资本开支（推高），（2）漏掉合资企业按比例的成本与资本开支加项（压低，且实测占优）。<b>残差未做调平，按算出来的原样报告。</b>",
+        "aisc_note": "<b>本公司的 AISC 利润率在 2013Q1–2022H2 整段被撤回、不予发布。</b>公布 AISC 的分母是<b>归属口径且含权益法合资企业</b>的盎司与收入，而我们的黄金收入是<b>合并口径、不含权益法</b>。2014Q4 6-K 原文：利润表「Gold income 1,278」、分部附注「Equity-accounted investments included above (142)」，而 AISC 附录是「Attributable gold income ... 1,407」÷「Attributable gold sold - oz (000) 1,171」，公司自报 Price received $1,202，我们算出来是 $1,091。拿归属口径的 AISC 去除合并口径的价格，利润率被压低 4.9–23.8 个百分点。正确的分母公司披露了，但尚未提取，因此<b>宁可留空也不发布一个已知错误的数</b>。2023Q1 起公司自身口径变更，两者一致，从该期起恢复发布。原公布 AISC 为<b>归属口径且包含权益法合资企业</b>，而收入与成本是合并口径。我们自建的对账式沿用本行自己的合并口径字段，因此与公司公布值之间存在<b>两个方向相反的已知缺口</b>：（1）用全部资本开支而非维持性资本开支（推高），（2）漏掉合资企业按比例的成本与资本开支加项（压低，且实测占优）。<b>残差未做调平，按算出来的原样报告。</b>",
         "quirks": [
             "<b>我曾两次断言这家公司空着的权利金与复垦列在静默漏掉成本、每行值 3.9–4.6 个百分点、是面板最大的单一缺陷。这是错的。</b>派去修它的任务从 Cost of sales 附注提出了 8 个期间的真实权利金再从营业成本里减掉，GAIM 变动的行数<b>为零</b>——证明权利金本来就在营业成本里面。错因是判定「哪些字段已被别行包含」的白名单只按四家公司标定过，安格鲁与金田从来不在其中。",
             "2016 年起停发独立季报：41 行中 13 行为<b>半年</b>观测，画在图上占六个月宽度，不拆成季度。",
@@ -231,15 +231,21 @@ for p in sorted(q.quarter.unique(), key=lambda s: span(s)[0]):
         "breach": int(row.companies_breaching_aisc_cap) if row is not None else 0,
     })
 
-kept = q[~q.is_outlier]
+# Headline aggregate: outliers trimmed AND X-grade rows dropped. in_headline_
+# aggregate existed as a column that nothing read, so 22 rows the fidelity rules
+# call unpublishable were sitting inside the headline number.
+kept = q[~q.is_outlier & q.in_headline_aggregate]
 eras = []
 for lo, hi, label in [(2013, 2016, "2013–2016 谷底"), (2017, 2020, "2017–2020 复苏"),
                       (2021, 2026, "2021–2026 牛市")]:
     e = kept[(kept.quarter.str[:4].astype(int) >= lo) & (kept.quarter.str[:4].astype(int) <= hi)]
     gaim = (e.gold_revenue - e.gold_cost_total).sum() / e.gold_revenue.sum() * 100
-    aisc = (e.aisc_margin * e.gold_revenue).sum() / e.gold_revenue.sum()
+    # Weight AISC over the revenue that HAS an AISC. Leaving AISC-less revenue in
+    # the denominator silently scores those periods as a zero AISC margin.
+    ea = e[e.aisc_margin.notna()]
+    aisc = (ea.aisc_margin * ea.gold_revenue).sum() / ea.gold_revenue.sum()
     eras.append({"label": label, "lo": lo, "hi": hi, "n": len(e),
-                 "gaim": round(gaim, 2), "aisc": round(aisc, 2),
+                 "n_aisc": len(ea), "gaim": round(gaim, 2), "aisc": round(aisc, 2),
                  "gap": round(aisc - gaim, 1)})
 
 payload = {
