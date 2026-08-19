@@ -1,1 +1,1 @@
-ticker,quarter,gold_revenue,gold_oz_sold,realised_price,w_gold,L0a,L0b,aisc_margin,L1,L2,L2_n,published_aisc,aisc_comparable,aisc_basis_note,gold_cost_total,total_revenue,aisc_ratio,is_outlier,sector_distress,sector_breach_share,sector_breach_n,recon_residual_pct,flags
+ticker,quarter,gold_revenue,gold_oz_sold,realised_price,w_gold,L0a,L0b,aisc_margin,L1,L2,L2_n,published_aisc,aisc_comparable,aisc_basis_note,gold_cost_total,total_revenue,aisc_ratio,is_outlier,sector_distress,sector_breach_share,sector_breach_n,sector_testable_n,recon_residual_pct,flags

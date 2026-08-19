@@ -193,8 +193,18 @@ def flag_outliers(panel):
     """
     panel["aisc_ratio"] = panel.aisc_comparable / panel.realised_price
     breach = panel.aisc_ratio > AISC_RATIO_CAP
-    panel["sector_breach_share"] = breach.groupby(panel.quarter).transform("mean")
+
+    # The share is over companies the test can actually be RUN on, not over every
+    # company present. A quarter where a company published no AISC says nothing
+    # about whether that company was in distress -- counting it in the denominator
+    # would silently enter it as evidence AGAINST sector distress. Agnico has
+    # exactly this in 2013Q4 and 2014Q4, which are its impairment quarters: the
+    # missing figure would have argued that the trough was idiosyncratic.
+    testable = panel.aisc_ratio.notna()
+    n_testable = testable.groupby(panel.quarter).transform("sum")
     panel["sector_breach_n"] = breach.groupby(panel.quarter).transform("sum")
+    panel["sector_testable_n"] = n_testable
+    panel["sector_breach_share"] = (panel.sector_breach_n / n_testable).where(n_testable > 0, 0.0)
     panel["sector_distress"] = ((panel.sector_breach_share >= SECTOR_DISTRESS_SHARE)
                                 & (panel.sector_breach_n >= SECTOR_DISTRESS_MIN_N))
     panel["is_outlier"] = breach & ~panel.sector_distress
@@ -284,7 +294,7 @@ def main():
             "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
             "aisc_ratio", "is_outlier", "sector_distress", "sector_breach_share",
-            "sector_breach_n",
+            "sector_breach_n", "sector_testable_n",
             "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
     out.to_csv(FINAL / "margins.csv", index=False)
