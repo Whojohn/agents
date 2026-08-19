@@ -60,6 +60,15 @@ TAX_REALLOCATION = {"AEM": [("2026Q1", 1300.0, 2025)]}
 # a statistical trim here: it never discards a real industry-wide move, and anyone
 # can check whether a given quarter passes it.
 AISC_RATIO_CAP = 0.80
+
+# ...but only when the breach is IDIOSYNCRATIC. The exclusion exists to stop one
+# company's bad year dragging the industry average down. When most of the covered
+# companies breach the cap in the same quarter, the breach is not an outlier --
+# it is the cycle, and dropping it would delete precisely the trough this series
+# exists to show. 2013-2015 is the case that makes this concrete. So a quarter in
+# which this share of covered companies breaches excludes nobody.
+SECTOR_DISTRESS_SHARE = 0.50
+
 SMOOTH_WINDOW = 4       # trailing quarters averaged
 
 
@@ -113,6 +122,16 @@ def load_company(path):
     # (a cash-economics margin). Never both -- that double-counts the same capital.
     d["L0a"] = (rev - site_cost - d.segment_dda.fillna(0)) / rev * 100
     d["L1"] = (rev - site_cost - group_cost) / rev * 100
+
+    # L0b -- company-level net margin, straight off the income statement. This is
+    # the ONLY published layer that carries impairments, and in 2013-2015 the
+    # impairments ARE the story: a deeply negative L0b is the correct reading of
+    # those years, not a data error. GAIM deliberately excludes them (it charges
+    # total capex, so adding a non-cash write-down of past capex would charge the
+    # same capital twice) -- which is exactly why the accounting layer has to be
+    # published alongside it rather than dropped.
+    if "net_income_attributable" in d:
+        d["L0b"] = d.net_income_attributable / d.total_revenue * 100
     d["realised_price"] = d[price_col] / d.gold_oz_sold * 1e6
 
     # Put every company's AISC on ONE basis before comparing: by-product, per gold
@@ -137,18 +156,50 @@ def load_company(path):
     return d
 
 
-def add_trimmed(d):
-    """Drop distressed quarters, then average what is left."""
-    d["aisc_ratio"] = d.aisc_comparable / d.realised_price
-    keep = d.aisc_ratio <= AISC_RATIO_CAP
-    d["is_outlier"] = ~keep
-    d["L2"] = d.L1.where(keep).rolling(SMOOTH_WINDOW, min_periods=1).mean()
+def flag_outliers(panel):
+    """Mark distressed company-quarters -- unless the whole sector is distressed.
 
-    log = [{"ticker": d.ticker.iloc[0], "quarter": r.quarter, "L1_value": round(r.L1, 2),
-            "aisc": round(r.aisc_comparable, 0), "realised_price": round(r.realised_price, 0),
-            "aisc_ratio_pct": round(r.aisc_ratio * 100, 1)}
-           for r in d.itertuples() if not keep.iloc[r.Index]]
-    return d, log
+    Needs the full cross-section, because whether a breach is an outlier or the
+    cycle is only answerable by looking at what the other companies did in the
+    same quarter. See SECTOR_DISTRESS_SHARE.
+    """
+    panel["aisc_ratio"] = panel.aisc_comparable / panel.realised_price
+    breach = panel.aisc_ratio > AISC_RATIO_CAP
+    panel["sector_breach_share"] = breach.groupby(panel.quarter).transform("mean")
+    panel["sector_distress"] = panel.sector_breach_share >= SECTOR_DISTRESS_SHARE
+    panel["is_outlier"] = breach & ~panel.sector_distress
+    return panel
+
+
+def add_smoothed(d):
+    """Average what survives the exclusion, over a trailing window."""
+    d = d.sort_values("quarter")
+    d["L2"] = d.L1.where(~d.is_outlier).rolling(SMOOTH_WINDOW, min_periods=1).mean()
+    return d
+
+
+def censoring_audit(panel):
+    """One row per quarter recording what the exclusion rule did, and to whom.
+
+    Published alongside the series so suppression is never silent: a reader can
+    see how much of any given quarter was removed before believing its level.
+    """
+    rows = []
+    for q, g in panel.groupby("quarter"):
+        breached = g[g.aisc_ratio > AISC_RATIO_CAP]
+        excluded = g[g.is_outlier]
+        rows.append({
+            "quarter": q, "companies_covered": len(g),
+            "companies_breaching_cap": len(breached),
+            "breach_share_pct": round(g.sector_breach_share.iloc[0] * 100, 1),
+            "sector_distress": bool(g.sector_distress.iloc[0]),
+            "companies_excluded": len(excluded),
+            "excluded_tickers": ";".join(sorted(excluded.ticker)),
+            "breaching_tickers": ";".join(sorted(breached.ticker)),
+            "L1_kept": round(g.loc[~g.is_outlier, "L1"].mean(), 2) if (~g.is_outlier).any() else None,
+            "L1_all": round(g.L1.mean(), 2),
+        })
+    return pd.DataFrame(rows)
 
 
 def build_annual(frames):
@@ -188,25 +239,31 @@ def main():
     if not files:
         raise SystemExit("no extracted company files in data/interim/")
 
-    frames, trims = [], []
-    for path in files:
-        d, log = add_trimmed(load_company(path))
-        frames.append(d)
-        trims.extend(log)
+    panel = flag_outliers(pd.concat(load_company(p) for p in files))
+    frames = [add_smoothed(g) for _, g in panel.groupby("ticker")]
+    audit = censoring_audit(panel)
 
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
-            "w_gold", "L0a", "aisc_margin", "L1", "L2", "published_aisc",
+            "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
-            "aisc_ratio", "is_outlier", "recon_residual_pct", "flags"]
+            "aisc_ratio", "is_outlier", "sector_distress", "sector_breach_share",
+            "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
     out.to_csv(FINAL / "margins.csv", index=False)
     annual = build_annual(frames)
     annual.to_csv(FINAL / "margins_annual.csv", index=False)
-    pd.DataFrame(trims).to_csv(FINAL / "trimmed_observations.csv", index=False)
+    audit.to_csv(FINAL / "censoring_audit.csv", index=False)
+    out[out.is_outlier].to_csv(FINAL / "trimmed_observations.csv", index=False)
 
     print(f"companies: {sorted(out.ticker.unique())}   quarterly rows: {len(out)}   "
           f"annual rows: {len(annual)} ({(~annual.complete).sum()} partial)")
-    print(f"trimmed observations logged: {len(trims)}")
+    n_sector = int(audit.sector_distress.sum())
+    print(f"excluded observations: {int(out.is_outlier.sum())}   "
+          f"quarters shielded as sector-wide distress: {n_sector}")
+    if n_sector:
+        print(audit[audit.sector_distress][
+            ["quarter", "companies_breaching_cap", "companies_covered",
+             "L1_all", "L1_kept"]].to_string(index=False))
     for t, g in out.groupby("ticker"):
         print(f"  {t:5} L0a {g.L0a.mean():5.1f}%  AISC {g.aisc_margin.mean():5.1f}%  "
               f"GAIM {g.L1.mean():5.1f}%  gap {(g.aisc_margin - g.L1).mean():5.1f}pt")
