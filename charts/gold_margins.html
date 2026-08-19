@@ -241,35 +241,47 @@ let showRaw = false, geo, agg, aggSmooth, aggAisc, dropped;
 // industry average down. Nothing in the current four-company window trips it -- the
 // worst observation is Newmont 2023Q2 at 77.9% -- it is a guard for high-cost miners
 // and for the 2013-2015 trough once the series is extended back.
-const AISC_CAP = 0.80;
-// ...but only when the breach is idiosyncratic. A quarter in which a fifth of the
-// covered companies AND at least two of them breach at once is not an outlier
-// quarter -- it is the cycle, and dropping it would delete the trough this chart
-// exists to show. Mirrors flag_outliers() in src/build_series.py; the two
-// implementations must agree, so change them together.
-const SECTOR_DISTRESS_SHARE = 0.20;
-const SECTOR_DISTRESS_MIN_N = 2;
+// Exclusion runs on GAIM itself, against the same quarter's industry median, with
+// the scale estimated inside that quarter. Trimming on the AISC/price ratio was
+// abandoned because it does not track what it trims -- r(aisc_ratio, L1) is -0.89
+// in the bull window but -0.54 in the 2013-2016 trough -- so its effect on the
+// published number had no reliable sign. Measuring against the quarter's own
+// median is what makes this cycle-neutral: when the whole industry moves, the
+// reference moves with it and nobody is excluded.
+// Mirrors flag_outliers() in src/build_series.py. Change them together.
+const GAIM_OUTLIER_K = 3.0;
+const GAIM_OUTLIER_MIN_PT = 5.0;
+const GAIM_OUTLIER_MIN_PANEL = 4;
 const SMOOTH_MIN_PERIODS = 3;
+const AISC_CAP = 0.80;            // diagnostic only -- excludes nothing
 const excluded = [];
-let shielded = [];
+let outlier = [];                 // outlier[i] = Set of series ids dropped in quarter i
 
-// Recomputed per render because the covered set is whatever the user has selected.
-const sectorDistress = () => Q.map((_, i) => {
-  let covered = 0, breach = 0;
-  S.forEach(s => {
-    if (!sel.has(s.id) || s.rev[i] == null || s.oz[i] == null) return;
-    covered++;
-    if (s.aiscUsd[i] / s.price[i] > AISC_CAP) breach++;
+const median = a => {
+  const v = [...a].sort((x, y) => x - y), n = v.length;
+  return n ? (n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2) : null;
+};
+
+// Recomputed per render: the covered set is whatever the user has selected.
+const findOutliers = () => Q.map((_, i) => {
+  const live = S.filter(s => sel.has(s.id) && s.l1[i] != null && !isNaN(s.l1[i]));
+  const drop = new Set();
+  if (live.length < GAIM_OUTLIER_MIN_PANEL) return drop;
+  const med = median(live.map(s => s.l1[i]));
+  // 1.4826 makes the MAD a consistent estimator of sigma for normal data.
+  const scale = median(live.map(s => Math.abs(s.l1[i] - med))) * 1.4826;
+  live.forEach(s => {
+    const dev = Math.abs(s.l1[i] - med);
+    if (dev > GAIM_OUTLIER_K * scale && dev > GAIM_OUTLIER_MIN_PT) drop.add(s.id);
   });
-  return covered > 0 && breach / covered >= SECTOR_DISTRESS_SHARE
-                     && breach >= SECTOR_DISTRESS_MIN_N;
+  return drop;
 });
 
 const aggregate = (metric = 'cost') => Q.map((_, i) => {
   let rev = 0, cost = 0, n = 0;
   S.forEach(s => {
     if (!sel.has(s.id) || s.rev[i] == null || s.oz[i] == null) return;
-    if (!shielded[i] && s.aiscUsd[i] / s.price[i] > AISC_CAP) {    // idiosyncratic distress: drop it
+    if (outlier[i] && outlier[i].has(s.id)) {                     // GAIM outlier: drop it
       if (metric === 'cost') excluded.push(`${s.name} ${Q[i]}`);
       return;
     }
@@ -294,7 +306,7 @@ const hair = el('line', { class: 'grid', 'stroke-width': 1.5, y1: MQ.t, y2: 380 
 
 function renderMain() {
   excluded.length = 0;
-  shielded = sectorDistress();
+  outlier = findOutliers();
   agg = aggregate('cost');
   aggAisc = aggregate('aisc');
   aggSmooth = smooth(agg);
@@ -320,12 +332,8 @@ function renderMain() {
     ['AISC 未计入的成本', (gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(1) + ' 个百分点'],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 
-  const nShield = shielded.filter(Boolean).length;
-  const shieldNote = nShield
-    ? `；另有 ${nShield} 个季度因全行业同时破限（≥20% 且 ≥2 家）被判定为周期而非异常，未剔除任何公司`
-    : '';
   document.getElementById('dropNote').textContent = excluded.length
-    ? `已剔除 ${excluded.length} 个 AISC 占收入超过 80% 的困难观测：${excluded.join('、')}${shieldNote}`
+    ? `已剔除 ${excluded.length} 个偏离同季行业中位数超过 3 倍稳健离散度（且超过 5 个百分点）的观测：${excluded.join('、')}。剔除对称适用于两端，中位数随周期移动，故全行业同步下行不会剔除任何公司`
     : '本组合下无观测触及 80% 剔除线（最高为纽蒙特 2023Q2 的 77.9%）';
 }
 

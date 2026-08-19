@@ -16,6 +16,7 @@ data/final/trimmed_observations.csv.
 """
 import pathlib
 
+import numpy as np
 import pandas as pd
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -57,27 +58,41 @@ TAX_REALLOCATION = {"AEM": [("2026Q1", 1300.0, 2025)]}
 # share of the realised gold price. The point is to stop one company's distressed
 # year dragging the industry average down -- a miner running at a 90% cost ratio is
 # not representative of the sector, it is in trouble. A flat economic threshold beats
-# a statistical trim here: it never discards a real industry-wide move, and anyone
-# can check whether a given quarter passes it.
-AISC_RATIO_CAP = 0.80
-
-# ...but only when the breach is IDIOSYNCRATIC. The exclusion exists to stop one
-# company's bad year dragging the industry average down. When enough of the
-# covered companies breach the cap in the same quarter, the breach is not an
-# outlier -- it is the cycle, and dropping it would delete precisely the trough
-# this series exists to show. 2013-2015 is the case that makes this concrete. So
-# a quarter in which this share of covered companies breaches excludes nobody.
+# The exclusion runs on GAIM itself, cross-sectionally, against the same quarter's
+# industry median. The earlier rule trimmed on the AISC/price ratio, which turned
+# out not to track what it was trimming: r(aisc_ratio, L1) is -0.89 in the bull
+# window but only -0.54 in the 2013-2016 trough, because AISC charges sustaining
+# capex while GAIM charges all of it, and growth capex peaked exactly in the
+# trough. In 2013Q4 Newmont breached the AISC cap while posting the best GAIM of
+# the quarter, so removing it pushed the aggregate DOWN. A rule whose effect on
+# the published number has no reliable sign cannot be corrected for, only removed.
 #
-# Set at a fifth on the Pareto reading: a fifth of the industry in distress is
-# already a sector condition, not a company problem. Waiting for a majority sets
-# the bar where only a depression clears it, and every ordinary downturn --
-# which is what an investor actually needs to see -- gets excised on the way.
-SECTOR_DISTRESS_SHARE = 0.20
+# Measuring the deviation against the same quarter's median is what makes this
+# cycle-neutral: when the whole industry moves, the reference moves with it, so a
+# sector-wide collapse excludes nobody. The old sector-distress guard had to bolt
+# that property on; here it is structural.
+GAIM_OUTLIER_K = 3.0
 
-# A share alone binds badly on a small panel: at four or five companies a single
-# breach already clears a fifth, which would shield every quarter and leave the
-# exclusion permanently dormant. So the share must ALSO be backed by at least
-# this many companies. One company is never a sector.
+# The scale is estimated WITHIN each quarter, never pooled across the panel. That
+# is not a detail: dispersion in the trough (MAD-sigma 9.83) is 1.77x the bull
+# window's (5.55), so one pooled scale would have excluded 7.8% of trough
+# observations against 1.1% of bull ones -- reintroducing exactly the
+# trough-thinning the AISC rule was abandoned for, in a new disguise. Per-quarter
+# scaling brings that ratio to 1.6% vs 2.3%.
+GAIM_OUTLIER_MIN_PT = 5.0      # ...and the gap must also be this many points, so a
+                               # quarter where the companies happen to bunch cannot
+                               # exclude anyone on noise. Does not bind today; the
+                               # tightest observed quarterly scale is 0.68pt.
+GAIM_OUTLIER_MIN_PANEL = 4     # below this, no trimming at all -- an outlier is not
+                               # identifiable in a panel of three, and pretending
+                               # otherwise would mean the rule bites hardest in the
+                               # earliest years, where coverage is thinnest.
+
+# Kept as a REPORTED DIAGNOSTIC only -- it no longer excludes anything. The ratio
+# is externally verifiable and worth showing, and the sector-distress condition
+# still tells a reader that an industry-wide cost squeeze was under way.
+AISC_RATIO_CAP = 0.80
+SECTOR_DISTRESS_SHARE = 0.20
 SECTOR_DISTRESS_MIN_N = 2
 
 SMOOTH_WINDOW = 4       # trailing quarters averaged
@@ -200,21 +215,30 @@ def load_company(path):
 
 
 def flag_outliers(panel):
-    """Mark distressed company-quarters -- unless the whole sector is distressed.
+    """Mark company-quarters that are outliers IN GAIM, against their own quarter.
 
-    Needs the full cross-section, because whether a breach is an outlier or the
-    cycle is only answerable by looking at what the other companies did in the
-    same quarter. See SECTOR_DISTRESS_SHARE.
+    Needs the full cross-section: whether a reading is anomalous or simply what
+    the industry did that quarter is only answerable by looking at the others.
     """
+    med = panel.groupby("quarter").L1.transform("median")
+    panel["L1_median_q"] = med
+    panel["L1_dev"] = panel.L1 - med
+    # Robust scale, per quarter. 1.4826 makes the MAD a consistent estimator of
+    # sigma for normal data, so K reads as "sigmas" the way a reader expects.
+    panel["L1_scale_q"] = panel.groupby("quarter").L1_dev.transform(
+        lambda s: np.median(np.abs(s.dropna())) * 1.4826 if s.notna().any() else np.nan)
+    panel["panel_n_q"] = panel.groupby("quarter").L1.transform("count")
+
+    panel["is_outlier"] = (
+        (panel.L1_dev.abs() > GAIM_OUTLIER_K * panel.L1_scale_q)
+        & (panel.L1_dev.abs() > GAIM_OUTLIER_MIN_PT)
+        & (panel.panel_n_q >= GAIM_OUTLIER_MIN_PANEL)
+    ).fillna(False)
+
+    # Diagnostics only -- these gate nothing now, but a reader still wants to see
+    # when the industry as a whole was running costs against the gold price.
     panel["aisc_ratio"] = panel.aisc_comparable / panel.realised_price
     breach = panel.aisc_ratio > AISC_RATIO_CAP
-
-    # The share is over companies the test can actually be RUN on, not over every
-    # company present. A quarter where a company published no AISC says nothing
-    # about whether that company was in distress -- counting it in the denominator
-    # would silently enter it as evidence AGAINST sector distress. Agnico has
-    # exactly this in 2013Q4 and 2014Q4, which are its impairment quarters: the
-    # missing figure would have argued that the trough was idiosyncratic.
     testable = panel.aisc_ratio.notna()
     n_testable = testable.groupby(panel.quarter).transform("sum")
     panel["sector_breach_n"] = breach.groupby(panel.quarter).transform("sum")
@@ -222,7 +246,6 @@ def flag_outliers(panel):
     panel["sector_breach_share"] = (panel.sector_breach_n / n_testable).where(n_testable > 0, 0.0)
     panel["sector_distress"] = ((panel.sector_breach_share >= SECTOR_DISTRESS_SHARE)
                                 & (panel.sector_breach_n >= SECTOR_DISTRESS_MIN_N))
-    panel["is_outlier"] = breach & ~panel.sector_distress
     return panel
 
 
@@ -248,18 +271,23 @@ def censoring_audit(panel):
     """
     rows = []
     for q, g in panel.groupby("quarter"):
-        breached = g[g.aisc_ratio > AISC_RATIO_CAP]
         excluded = g[g.is_outlier]
+        breached = g[g.aisc_ratio > AISC_RATIO_CAP]
         rows.append({
             "quarter": q, "companies_covered": len(g),
-            "companies_breaching_cap": len(breached),
-            "breach_share_pct": round(g.sector_breach_share.iloc[0] * 100, 1),
-            "sector_distress": bool(g.sector_distress.iloc[0]),
+            "panel_n_scored": int(g.panel_n_q.iloc[0]) if g.panel_n_q.notna().any() else 0,
+            "L1_median_q": round(g.L1_median_q.iloc[0], 2) if g.L1_median_q.notna().any() else None,
+            "L1_scale_q": round(g.L1_scale_q.iloc[0], 2) if g.L1_scale_q.notna().any() else None,
             "companies_excluded": len(excluded),
             "excluded_tickers": ";".join(sorted(excluded.ticker)),
-            "breaching_tickers": ";".join(sorted(breached.ticker)),
+            "excluded_devs": ";".join(f"{t}{d:+.1f}" for t, d in
+                                      zip(excluded.ticker, excluded.L1_dev)),
             "L1_kept": round(g.loc[~g.is_outlier, "L1"].mean(), 2) if (~g.is_outlier).any() else None,
             "L1_all": round(g.L1.mean(), 2),
+            # diagnostic, no longer a gate
+            "companies_breaching_aisc_cap": len(breached),
+            "breaching_tickers": ";".join(sorted(breached.ticker)),
+            "sector_distress_diagnostic": bool(g.sector_distress.iloc[0]),
         })
     return pd.DataFrame(rows)
 
@@ -308,7 +336,8 @@ def main():
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
             "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
-            "aisc_ratio", "is_outlier", "sector_distress", "sector_breach_share",
+            "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
+            "panel_n_q", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",
             "recon_residual_pct", "flags"]
     out = pd.concat(frames).reindex(columns=cols).sort_values(["ticker", "quarter"])
@@ -320,13 +349,15 @@ def main():
 
     print(f"companies: {sorted(out.ticker.unique())}   quarterly rows: {len(out)}   "
           f"annual rows: {len(annual)} ({(~annual.complete).sum()} partial)")
-    n_sector = int(audit.sector_distress.sum())
-    print(f"excluded observations: {int(out.is_outlier.sum())}   "
-          f"quarters shielded as sector-wide distress: {n_sector}")
-    if n_sector:
-        print(audit[audit.sector_distress][
-            ["quarter", "companies_breaching_cap", "companies_covered",
-             "L1_all", "L1_kept"]].to_string(index=False))
+    n_ex = int(out.is_outlier.sum())
+    n_sector = int(audit.sector_distress_diagnostic.sum())
+    print(f"excluded observations: {n_ex} of {len(out)} "
+          f"({n_ex / len(out) * 100:.1f}%)   "
+          f"quarters flagged sector-wide distress (diagnostic only): {n_sector}")
+    if n_ex:
+        print(audit[audit.companies_excluded > 0][
+            ["quarter", "panel_n_scored", "L1_median_q", "L1_scale_q",
+             "excluded_devs", "L1_all", "L1_kept"]].to_string(index=False))
     for t, g in out.groupby("ticker"):
         print(f"  {t:5} L0a {g.L0a.mean():5.1f}%  AISC {g.aisc_margin.mean():5.1f}%  "
               f"GAIM {g.L1.mean():5.1f}%  gap {(g.aisc_margin - g.L1).mean():5.1f}pt")
