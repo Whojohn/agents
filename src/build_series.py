@@ -139,7 +139,7 @@ SMOOTH_MIN_MONTHS = 9       # ...and the minimum real coverage inside it
 # forbids splitting a half, and interpolating one would manufacture a quarterly
 # cycle that was never reported.
 PERIODS_PER_YEAR = {"Q": 4, "H": 2}
-PERIOD_MONTHS = {"Q": 3, "H": 6}
+PERIOD_MONTHS = {"Q": 3, "H": 6, "A": 12}
 
 # AngloGold is not one frequency or the other -- it reported half-yearly through
 # 2022, quarterly in 2021Q1-Q2 and again from 2023. So frequency cannot be a
@@ -149,14 +149,30 @@ PERIOD_MONTHS = {"Q": 3, "H": 6}
 
 
 def period_freq(period):
-    """'2021Q3' -> 'Q'; '2021H1' -> 'H'."""
-    return "H" if "H" in str(period)[4:] else "Q"
+    """'2021Q3' -> 'Q'; '2021H1' -> 'H'; '2005FY' -> 'A'.
+
+    'A' exists because Kinross filed NOTHING interim in 2005 -- no quarter of
+    that year is recoverable, and the only figures that exist are the audited
+    annual ones in the FY2006 40-F. Splitting them into four quarters is the
+    pro-rata the methodology forbids, so the year is carried as one 12-month
+    observation instead. Before this, period_freq read '2005FY' as 'Q' (there
+    is no 'H' in 'FY') and period_start_month then died on int('Y') -- loudly,
+    which is the one good thing about it.
+    """
+    tail = str(period)[4:]
+    if tail.upper().startswith(("FY", "A")):
+        return "A"
+    return "H" if "H" in tail else "Q"
 
 
 def period_start_month(period):
-    """First month of the period, 1-12. Q3 -> 7; H2 -> 7."""
-    p, n = str(period), int(str(period)[5])
-    return (n - 1) * 6 + 1 if period_freq(p) == "H" else (n - 1) * 3 + 1
+    """First month of the period, 1-12. Q3 -> 7; H2 -> 7; FY -> 1."""
+    p = str(period)
+    f = period_freq(p)
+    if f == "A":
+        return 1
+    n = int(p[5])
+    return (n - 1) * 6 + 1 if f == "H" else (n - 1) * 3 + 1
 
 
 def period_order(period):
@@ -377,7 +393,7 @@ def flag_outliers(panel):
     # nothing. The failure it was reaching for is a row whose label says one
     # length and whose months column says another, which is a real thing an
     # extraction agent can produce. Check that instead.
-    bad = panel[panel.months != panel.quarter.str[4].map({"Q": 3, "H": 6})]
+    bad = panel[panel.months != panel.quarter.map(period_freq).map(PERIOD_MONTHS)]
     assert bad.empty, ("period label disagrees with months column: "
                        + str(bad[["ticker", "quarter", "months"]].to_dict("records")[:5]))
     med = panel.groupby("quarter").L1.transform("median")
@@ -410,16 +426,21 @@ def flag_outliers(panel):
     # half-year figure. Aggregating quarters INTO a half is allowed; it is
     # SPLITTING a half into quarters that the methodology forbids. Every
     # observation is then judged against a panel built at its own frequency.
-    panel["_half"] = (panel.quarter.str[:4] + "H"
-                      + np.where(panel.quarter.str[4] == "H", panel.quarter.str[5],
-                                 np.where(panel.quarter.str[5].astype(int) <= 2, "1", "2")))
+    # Annual rows get no half. A 12-month figure placed in a 6-month bucket is
+    # the split we refused to make when extracting it.
+    ann = panel.freq == "A"
+    panel["_half"] = np.where(
+        ann, "",
+        panel.quarter.str[:4] + "H"
+        + np.where(panel.quarter.str[4] == "H", panel.quarter.str[5],
+                   np.where(panel.quarter.str[5].where(~ann, "1").astype(int) <= 2, "1", "2")))
     fold = (panel.assign(_rw=panel.L1 * panel.gold_revenue)
                  .groupby(["_half", "ticker"])
                  .agg(_rw=("_rw", "sum"), _rev=("gold_revenue", "sum"),
                       _mon=("months", "sum"), _n=("L1", "count")))
     # A company enters the half-year cross-section only if it actually covers
     # the whole half. A single reported quarter is not a half-year observation.
-    fold = fold[(fold._mon == 6) & (fold._n > 0)]
+    fold = fold[(fold._mon == 6) & (fold._n > 0) & (fold.index.get_level_values("_half") != "")]
     fold["_g"] = fold._rw / fold._rev
     grp = fold.groupby("_half")._g
     hstat = pd.DataFrame({

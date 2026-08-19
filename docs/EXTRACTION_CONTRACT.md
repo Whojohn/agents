@@ -12,13 +12,15 @@ conflict to the main agent. A rule that bends per-agent is not a rule.**
 |---|---|
 | Currency | **USD millions**, 3 decimals. Pilot 6 all report in USD — if you find otherwise, STOP and report. Never use an external FX source; if translation is needed use the rate the filing itself discloses. |
 | Ounces | **Troy ounces, absolute** (1,232,000 — not "1,232 koz", not "1.232 Moz"). The koz/Moz confusion has already produced one dimensionally impossible figure in this project. |
-| Signs | **All cost and outflow items entered POSITIVE.** The formula subtracts them. Never enter a cost as negative. |
+| Signs | **Enter every item with its TRUE economic sign.** Costs and outflows are normally positive and the formula subtracts them, so never flip a cost negative to represent "not disclosed", to net two things together, or to force a result. But a genuine net INFLOW on a cost line stays negative: a net tax refund, a quarter with more interest income than expense. Subtracting a negative correctly adds it back. *(Ruling, 2005-2012 round: the old wording said "never negative" flatly, which would have forced Kinross's 2008Q4 net tax refund of -7.9 and its 2006Q4-2008Q1 net interest income to be entered as costs of the same size — an error of twice the amount, in the wrong direction, on a line the reader cannot see.)* |
 | Basis | **Attributable**, not consolidated. If the filing gives only consolidated, record it, set `basis="consolidated"`, and flag `ONLY_CONSOLIDATED`. Record both when both are given. |
 | Ounces measure | **SOLD**, never produced. Agnico Eagle reports per ounce *produced* — you must locate ounces *sold*. If only produced is available, flag `ONLY_PRODUCED` and record it in a separate field; do not silently substitute. |
 | Period | Calendar quarter. **Q4 is derived as FY − Q1 − Q2 − Q3** wherever only cumulative figures are published; set `derived_q4=true`. |
 | Half-yearly filers | Record as `2025H1` / `2025H2`. **Never split a half into two quarters.** Never interpolate. |
 | Cumulative figures | Many 6-K releases give year-to-date, not discrete-quarter, figures (Agnico Q3 2025 capex was 9-month cumulative). Derive the discrete quarter by subtraction and set `derived_from_cumulative=true`. If the prior period is unavailable, flag `ONLY_CUMULATIVE` and leave the discrete field null. |
 | Rounding | Record what the filing states. Do not re-round, do not "clean up". |
+| Annual-only periods | A year in which the company filed nothing interim is recorded as ONE annual row labelled `<YYYY>FY`, `report_frequency="annual"`, flagged `ONLY_ANNUAL`. **Never split it into quarters** — that is the pro-rata this document forbids everywhere else. Such a row is carried as a company observation but is excluded from the half-year aggregate, because a 12-month figure cannot be placed in a 6-month bucket without the split we just refused. |
+| `derived_q4` | Boolean column, set true wherever Q4 came out of FY − Q1 − Q2 − Q3. It was named in this table but missing from the schema in section D; it is a real column. |
 
 ## B. Provenance — mandatory on every single number
 
