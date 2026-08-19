@@ -324,6 +324,15 @@ def load_company(path):
                                      d.published_aic if "published_aic" in d else d.published_aisc)
         d["recon_basis_used"] = basis_col.where(ref.notna(), None)
         d["recon_residual_calc"] = (d.recon_aisc - ref) / ref * 100
+        # The contract makes an observation admissible only if the reconstruction
+        # ties within 2% or NO_AISC_CHECK is set with a reason. Mark the failures
+        # mechanically so they cannot pass unremarked: WHY a given row misses is
+        # in the extraction's own flags (Barrick's, for instance, is a
+        # consolidated cost stack over an attributable ounce count), but THAT it
+        # misses should not depend on a reader noticing.
+        miss = d.recon_residual_calc.abs() > 2.0
+        if miss.any():
+            d.loc[miss, "flags"] = d.loc[miss, "flags"].fillna("") + ";CHECKSUM_OUTSIDE_GATE"
     d["aisc_comparable"], d["aisc_basis_note"] = aisc, basis
     d["aisc_margin"] = (1 - aisc / d.realised_price) * 100
     d["gold_revenue"] = rev
