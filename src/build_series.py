@@ -168,10 +168,25 @@ def load_company(path):
     # PRODUCED -- and comparing them unconverted makes a presentation choice look
     # like an economic difference.
     aisc = d.published_aisc.copy()
-    basis = "as published (by-product, per oz sold)"
-    if "published_aisc_byproduct" in d and d.published_aisc_byproduct.notna().any():
-        aisc = d.published_aisc_byproduct           # Newmont (co-product headline), Kinross (GEO headline)
-        basis = "by-product column substituted for the published headline"
+    basis = pd.Series("as published (by-product, per oz sold)", index=d.index)
+
+    # The substitution has to be decided PER ROW, not per column. Newmont publishes
+    # a by-product figure alongside its co-product headline from 2021 but not in
+    # 2013-2016, and a column-level test (.any()) substituted the whole column --
+    # blanking every pre-2017 row of the company that ran the deepest cost squeeze
+    # in the sample. An observation that carries a published AISC must never fall
+    # out of the comparison because a SECOND, preferred figure is missing; it falls
+    # back to the headline and says so.
+    if "published_aisc_byproduct" in d:
+        bp = d.published_aisc_byproduct
+        aisc = bp.where(bp.notna(), aisc)           # Newmont, Kinross: prefer by-product
+        sub = bp.notna()
+        basis = basis.where(~sub, "by-product column substituted for the published headline")
+        fallback = (~sub) & d.published_aisc.notna()
+        basis = basis.where(~fallback, "published headline used -- no by-product figure this period")
+        if fallback.any():
+            d.loc[fallback, "flags"] = d.loc[fallback, "flags"].fillna("") + ";AISC_BASIS_FALLBACK"
+
     if "aisc_denominator_oz" in d and d.aisc_denominator_oz.notna().any() \
             and str(d.aisc_basis.iloc[0]).lower().startswith("by-product"):
         # Agnico: restate per-ounce-produced onto an ounces-sold denominator
