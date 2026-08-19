@@ -575,7 +575,7 @@ LEGACY_A_EQUIVALENT = {
     # royalty figures for eight periods and subtracting them out of
     # opcost_ex_dda moved GAIM on exactly ZERO rows, which is only possible if
     # the royalties were already inside opcost. The blank was presentational.
-    # Gold Fields needs no entry: it populates royalties on all 32 rows.
+    # Gold Fields carries an explicit TIERAEQ flag on its own rows instead.
     ("AU", "royalties"), ("AU", "reclamation_accretion"),
 }
 
