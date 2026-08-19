@@ -58,7 +58,17 @@ PAIC_GROUP = ["corporate_g_and_a", "exploration_expensed", "capex_total",
 
 
 def _half(period):
-    year, kind, n = int(period[:4]), period[4], int(period[5:])
+    """Half-year label, or None for an annual row.
+
+    Fourth place this pipeline died on int('Y'). '2005FY' is Kinross's only
+    2005 observation -- it filed nothing interim that year -- and a 12-month
+    figure has no half to belong to. Returning None says so; returning
+    '2005H1' would be a claim the filing never made.
+    """
+    kind = period[4]
+    if kind in "FA":
+        return None
+    year, n = int(period[:4]), int(period[5:])
     return f"{year}H{n if kind == 'H' else (1 if n <= 2 else 2)}"
 
 
@@ -88,23 +98,82 @@ def gate_price_convergence(panel):
     # attributable revenue with attributable ounces for the price.
     d["implied_price"] = d.realised_price
     d["half"] = d.quarter.map(_half)
+    # Numerator and denominator must cover the SAME rows. price * oz is NaN
+    # wherever the price is missing and pandas drops it from the sum, but the
+    # ounces were still counted in tot_oz -- so every company that discloses
+    # ounces without a gold revenue line inflated the denominator alone and
+    # halved the benchmark. Kinross does exactly that for 18 quarters
+    # (2006Q3-2010Q3: metal sales are one line, the gold/silver split starts in
+    # 2011), and the gate answered by declaring Newmont's 2007Q4 price 111% above
+    # its peers. It was 0.6% above the London average. Restricting both sums to
+    # rows carrying both figures is the whole fix; it is the same
+    # numerator-population defect the annual AISC rollup already carries a
+    # comment about, in a second function.
+    d["_ok"] = d.realised_price.notna() & d.gold_oz_sold.notna()
+    d["_rev"] = (d.realised_price * d.gold_oz_sold).where(d._ok)
+    d["_oz"] = d.gold_oz_sold.where(d._ok)
     grp = d.groupby("quarter")
-    d["peer_n"] = grp.ticker.transform("nunique")
+    d["peer_n"] = grp._ok.transform("sum")
     # Leave-one-out reference, so a single bad row cannot drag the benchmark
     # toward itself and hide inside it.
-    tot_rev = grp.apply(lambda g: (g.realised_price * g.gold_oz_sold).sum(),
-                        include_groups=False).rename("tr")
-    tot_oz = grp.gold_oz_sold.sum().rename("to")
-    d = d.join(tot_rev, on="quarter").join(tot_oz, on="quarter")
-    d["panel_price"] = ((d.tr - d.realised_price * d.gold_oz_sold)
-                        / (d.to - d.gold_oz_sold))
+    d = (d.join(grp._rev.sum().rename("tr"), on="quarter")
+          .join(grp._oz.sum().rename("to"), on="quarter"))
+    d["panel_price"] = ((d.tr - d._rev.fillna(0))
+                        / (d.to - d._oz.fillna(0)))
     d["price_dev_pct"] = (d.implied_price - d.panel_price) / d.panel_price * 100
+    # peer_n counts rows WITH a price; the row itself is left out of the
+    # benchmark, so it must be left out of the count that decides testability.
+    d["peer_n"] = d.peer_n - d._ok.astype(int)
     d["gate1_testable"] = (d.peer_n >= MIN_PEERS) & d.panel_price.notna() \
                           & d.implied_price.notna()
     d["gate1_pass"] = ~d.gate1_testable | (d.price_dev_pct.abs() <= PRICE_TOL_PCT)
     return d[["ticker", "quarter", "half", "peer_n", "implied_price", "panel_price",
               "price_dev_pct", "gate1_testable", "gate1_pass"]]
 
+
+
+# Quarterly average London gold price, USD/oz, rounded to the dollar. This is a
+# REFERENCE for a diagnostic, never an input: no published figure in this
+# project is computed from it, and the extraction contract's ban on external
+# sources is about figures that enter the dataset. It earns its place because
+# gate 1 is a leave-one-out PEER test, and a peer test can only say that one
+# company differs from the others -- it cannot say which of them is wrong. With
+# four constituents before 2011 that is a real weakness. An absolute reference
+# resolves it, and did: it showed AngloGold 8-31% below market for 24
+# consecutive quarters ending exactly at 2010Q4, which is its hedge book (closed
+# 2010-10-07), and it showed Agnico ABOVE market in the quarters where its gold
+# revenue is a residual after by-product credits -- contamination, not a price.
+LONDON_GOLD_Q = {
+    "2005Q1": 427, "2005Q2": 427, "2005Q3": 440, "2005Q4": 485,
+    "2006Q1": 554, "2006Q2": 628, "2006Q3": 622, "2006Q4": 614,
+    "2007Q1": 650, "2007Q2": 667, "2007Q3": 681, "2007Q4": 787,
+    "2008Q1": 925, "2008Q2": 896, "2008Q3": 871, "2008Q4": 795,
+    "2009Q1": 909, "2009Q2": 922, "2009Q3": 960, "2009Q4": 1100,
+    "2010Q1": 1109, "2010Q2": 1197, "2010Q3": 1227, "2010Q4": 1367,
+    "2011Q1": 1386, "2011Q2": 1509, "2011Q3": 1702, "2011Q4": 1688,
+    "2012Q1": 1691, "2012Q2": 1611, "2012Q3": 1652, "2012Q4": 1721,
+}
+REF_TOL_PCT = 8.0   # wide: realised price legitimately differs from the average
+                    # by timing of sales within the quarter and by provisional
+                    # pricing. 8% is well outside that and inside the hedge
+                    # discount, which ran to 31%.
+
+
+def gate_reference_price(panel):
+    """Gate 5. Realised price against the market average for the same quarter.
+
+    Only quarters are testable: a half-year or annual row spans a window the
+    quarterly reference cannot represent without averaging, and averaging is the
+    step that hides the thing this gate looks for.
+    """
+    d = panel.copy()
+    d["ref_price"] = d.quarter.map(LONDON_GOLD_Q)
+    d["ref_dev_pct"] = (d.realised_price - d.ref_price) / d.ref_price * 100
+    d["gate5_testable"] = d.ref_price.notna() & d.realised_price.notna()
+    d["gate5_pass"] = ~d.gate5_testable | (d.ref_dev_pct.abs() <= REF_TOL_PCT)
+    return d[["ticker", "quarter", "realised_price", "ref_price", "ref_dev_pct",
+              "gate5_testable", "gate5_pass", "is_outlier",
+              "in_headline_aggregate"]]
 
 def gate_paic_ratio(interim, panel):
     """Gate 4 / section 7.5. Forward-computed cost ratio, no published AISC.
@@ -212,6 +281,23 @@ def main():
     print("        NOTE: this gate validates the DENOMINATOR only. It is not "
           "evidence that any cost line was read correctly (section 7.4).")
 
+    g5 = gate_reference_price(panel)
+    n5 = int(g5.gate5_testable.sum())
+    f5 = g5[g5.gate5_testable & ~g5.gate5_pass]
+    inagg = f5[~f5.is_outlier & f5.in_headline_aggregate]
+    print(f"\ngate 5  realised price vs London market (<= {REF_TOL_PCT}%): "
+          f"{n5} of {len(g5)} testable, {len(f5)} outside, "
+          f"{len(inagg)} of those inside the headline aggregate")
+    if len(f5):
+        print(f5.reindex(f5.ref_dev_pct.abs().sort_values(ascending=False).index)
+                [["ticker", "quarter", "realised_price", "ref_price",
+                  "ref_dev_pct", "in_headline_aggregate"]]
+                .head(12).to_string(index=False))
+    print("        Failing is not the same as wrong. AngloGold's run of negative "
+          "deviations to 2010Q3 is its hedge book and belongs in the series; "
+          "Agnico's positive ones are by-product contamination and are already "
+          "trimmed. Read this gate as 'explain each of these', not 'drop them'.")
+
     g4 = gate_paic_ratio(interim, panel)
     n4 = int(g4.gate4_testable.sum())
     f4 = g4[g4.gate4_testable & ~g4.gate4_pass]
@@ -224,7 +310,7 @@ def main():
                 .to_string(index=False))
     over_2013 = f4[f4.quarter.str[:4].astype(int) <= 2016]
     print(f"        DIAGNOSTIC ONLY, it excludes nothing. {len(over_2013)} of "
-          f"{len(f4)} breaches fall in 2013-2016, when cost ratios near 1.00 were "
+          f"{len(f4)} breaches fall in 2016 or earlier, when cost ratios near 1.00 were "
           f"the industry's actual condition rather than an extraction fault -- "
           f"using this as an exclusion rule would delete the trough it is "
           f"supposed to measure (the same defect the AISC ratio cap has).")
@@ -238,8 +324,9 @@ def main():
     FINAL.mkdir(parents=True, exist_ok=True)
     g1.to_csv(FINAL / "gate_price_convergence.csv", index=False)
     g4.to_csv(FINAL / "gate_paic_ratio.csv", index=False)
+    g5.to_csv(FINAL / "gate_reference_price.csv", index=False)
     blocked_gates(interim).to_csv(FINAL / "gates_blocked.csv", index=False)
-    print(f"\nwrote 3 gate logs to {FINAL}")
+    print(f"\nwrote 4 gate logs to {FINAL}")
     print("\n2013 前的净结论：capex + 现金税 + 净利息（约占 GAIM 成本栈 38%）"
           "在闸门 2 与 3 落地之前没有任何独立验证。")
     return 0
