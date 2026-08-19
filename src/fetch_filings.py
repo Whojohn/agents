@@ -145,7 +145,11 @@ COMPANIES: list[Company] = [
         name="Agnico Eagle Mines Ltd",
         ciks=["0000002809"],
         quarterly_forms=["6-K"],
-        annual_forms=["40-F"],
+        # 40-F from FY2013 (filed 2014) onward; FY2012 and earlier annual
+        # reports (filed through 2013-03-28) were filed as 20-F. Both are
+        # listed so pre-2014 calibration windows still pick up the annual
+        # filing -- see docs/SEC_COVERAGE.md.
+        annual_forms=["40-F", "20-F"],
     ),
     Company(
         ticker="AU",
@@ -690,10 +694,20 @@ def gather_filings(company: Company) -> list[dict]:
 
 
 def main():
+    global START_DATE, END_DATE
     ap = argparse.ArgumentParser()
     ap.add_argument("--tickers", default=None, help="comma-separated subset, e.g. NEM,GOLD")
     ap.add_argument("--limit", type=int, default=None, help="cap filings per company (debug)")
+    ap.add_argument(
+        "--since", type=_parse_date, default=START_DATE,
+        help=f"start date YYYY-MM-DD (default {START_DATE.isoformat()})",
+    )
+    ap.add_argument(
+        "--until", type=_parse_date, default=END_DATE,
+        help=f"end date YYYY-MM-DD (default {END_DATE.isoformat()})",
+    )
     args = ap.parse_args()
+    START_DATE, END_DATE = args.since, args.until
 
     companies = COMPANIES
     if args.tickers:
@@ -738,16 +752,23 @@ def main():
         "local_path", "bytes", "sha256", "has_operating_stats",
         "has_financial_statements", "doc_role", "status",
     ]
+    # Merge with whatever the manifest already holds. A run scoped by --tickers,
+    # --since or --until only ever sees part of the corpus, so overwriting would
+    # silently drop every row outside this run's scope. Current-run rows win on
+    # collision; (accession, seq) is the natural key for an exhibit.
+    merged = merge_manifest_rows(all_rows, fieldnames)
+
     with open(MANIFEST_PATH, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
-        for r in all_rows:
+        for r in merged:
             w.writerow(r)
 
-    logger.info(f"Manifest written: {MANIFEST_PATH} ({len(all_rows)} rows)")
+    logger.info(f"Manifest written: {MANIFEST_PATH} "
+                f"({len(merged)} rows; {len(all_rows)} from this run)")
     logger.info(f"Elapsed: {time.time() - t0:.1f}s")
 
-    write_coverage_matrix(all_rows, companies)
+    write_coverage_matrix(merged)
 
 
 def quarter_range(start: str, end: str) -> list[str]:
@@ -763,9 +784,31 @@ def quarter_range(start: str, end: str) -> list[str]:
     return out
 
 
-def write_coverage_matrix(rows: list[dict], companies: list[Company]):
-    quarters = quarter_range("2021-Q1", "2026-Q2")
-    tickers = [c.ticker for c in companies]
+def merge_manifest_rows(new_rows: list[dict], fieldnames: list[str]) -> list[dict]:
+    """Union of the manifest on disk and this run's rows, current run winning."""
+    by_key: dict[tuple[str, str], dict] = {}
+    if os.path.exists(MANIFEST_PATH):
+        with open(MANIFEST_PATH, newline="") as f:
+            for r in csv.DictReader(f):
+                by_key[(r.get("accession", ""), r.get("seq", ""))] = {
+                    k: r.get(k, "") for k in fieldnames
+                }
+    for r in new_rows:
+        by_key[(str(r.get("accession", "")), str(r.get("seq", "")))] = r
+    return sorted(by_key.values(),
+                  key=lambda r: (r["ticker"], r["filing_date"], r["accession"],
+                                 r["exhibit_filename"]))
+
+
+def write_coverage_matrix(rows: list[dict]):
+    """Coverage over whatever the merged manifest actually spans.
+
+    Both the quarter range and the ticker list are derived from the rows, so a
+    windowed re-run widens the matrix instead of truncating it to its own scope.
+    """
+    periods = sorted({r["period_hint"] for r in rows if r.get("period_hint")})
+    quarters = quarter_range(periods[0], periods[-1]) if periods else []
+    tickers = sorted({r["ticker"] for r in rows})
 
     ops_present: dict[tuple[str, str], bool] = {}
     fin_present: dict[tuple[str, str], bool] = {}
