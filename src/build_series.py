@@ -275,11 +275,42 @@ def load_company(path):
         if fallback.any():
             d.loc[fallback, "flags"] = d.loc[fallback, "flags"].fillna("") + ";AISC_BASIS_FALLBACK"
 
-    if "aisc_denominator_oz" in d and d.aisc_denominator_oz.notna().any() \
-            and str(d.aisc_basis.iloc[0]).lower().startswith("by-product"):
-        # Agnico: restate per-ounce-produced onto an ounces-sold denominator
-        aisc = aisc * d.aisc_denominator_oz / d.gold_oz_sold
-        basis = "restated from per-ounce-produced to per-ounce-sold"
+    # Restate a per-ounce-PRODUCED AISC onto an ounces-SOLD denominator, so it
+    # can be compared with a realised price that is revenue over ounces sold.
+    #
+    # This was decided per COLUMN and off the first row: it required
+    # aisc_basis.iloc[0] to start with "by-product". Agnico's first row is
+    # 2013Q1, whose basis string begins "single measure (pre-WGC AEM
+    # methodology), per ounce PRODUCED" -- so the test was False and the
+    # restatement never ran for ANY Agnico row, including the 2021+ rows whose
+    # basis does begin with "by-product". Every Agnico row then went out
+    # labelled "as published (by-product, per oz sold)", which is not true of a
+    # single one of them.
+    #
+    # The condition was also asking the wrong question. by-product vs
+    # co-product is about how BY-PRODUCT REVENUE is treated; produced vs sold
+    # is about the OUNCE DENOMINATOR. They are independent, and only the second
+    # one is what this restatement corrects.
+    if "aisc_denominator_oz" in d:
+        den = d.aisc_denominator_oz
+        per_produced = d.aisc_basis.astype(str).str.contains("produced", case=False, na=False)
+        do = per_produced & den.notna() & d.gold_oz_sold.notna() & aisc.notna()
+        aisc = aisc.where(~do, aisc * den / d.gold_oz_sold)
+        basis = basis.where(~do, "restated from per-ounce-produced to per-ounce-sold")
+        unfixed = per_produced & ~do
+        if unfixed.any():
+            d.loc[unfixed, "flags"] = (d.loc[unfixed, "flags"].fillna("")
+                                       + ";AISC_PER_PRODUCED_NOT_RESTATED")
+    # Recompute the AISC reconstruction residual instead of trusting the stored
+    # column. That column mixes units: some agents wrote a fraction (-0.009 for
+    # -0.9%), some wrote percent (1.667 for +1.67%), and NEM_quarterly.csv
+    # manages BOTH inside one column -- 0.0001 in 2017Q1 against 0.208 in
+    # 2025Q4. The contract's own admissibility gate is "ties within 2%", and it
+    # has never been enforced anywhere, because nothing could read the column it
+    # depends on. Derived here from the two figures themselves, so the gate is
+    # evaluable and the units are one thing.
+    if "recon_aisc" in d:
+        d["recon_residual_calc"] = (d.recon_aisc - d.published_aisc) / d.published_aisc * 100
     d["aisc_comparable"], d["aisc_basis_note"] = aisc, basis
     d["aisc_margin"] = (1 - aisc / d.realised_price) * 100
     d["gold_revenue"] = rev
@@ -688,7 +719,7 @@ def main():
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
             "panel_n_q", "L2_months", "months", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",
-            "recon_residual_pct",
+            "recon_residual_pct", "recon_residual_calc",
             "fidelity_vector", "fidelity_grade", "bias_pt_central",
             "bias_pt_lo", "bias_pt_hi", "bias_price_ref",
             "in_headline_aggregate", "bias_note", "flags"]
@@ -718,6 +749,15 @@ def main():
         print(f"  {t:5} L0a {g.L0a.mean():5.1f}%  AISC {g.aisc_margin.mean():5.1f}%  "
               f"GAIM {g.L1.mean():5.1f}%  gap {(g.aisc_margin - g.L1).mean():5.1f}pt")
 
+    rr = out.recon_residual_calc.abs()
+    gate = rr > 2.0
+    print(f"\nAISC checksum (recomputed): {int(rr.notna().sum())} rows testable, "
+          f"{int(gate.sum())} outside the contract's 2% gate")
+    if gate.any():
+        by_t = out[gate].groupby("ticker").agg(n=("quarter", "size"),
+                                               worst=("recon_residual_calc",
+                                                      lambda s: round(s.abs().max(), 1)))
+        print(by_t.to_string())
     print(f"\nflag vocabulary: 3 machine-read families, "
           f"{len(descriptive_flags)} descriptive codes in use")
     if flag_problems:
