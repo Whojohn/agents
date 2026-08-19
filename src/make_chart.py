@@ -79,8 +79,23 @@ HUE = {"NEM": ("#2a78d6", "#3987e5"), "GOLD": ("#eb6834", "#d95926"),
        "AEM": ("#1baf7a", "#199e70"), "KGC": ("#eda100", "#c98500")}
 ORDER = ["NEM", "GOLD", "AEM", "KGC"]
 
-quarters = sorted(q.quarter.unique())
-years = sorted(a.year.unique())
+def quarter_range(lo, hi):
+    """Every quarter from lo to hi inclusive, including ones we have no data for."""
+    out, y, k = [], int(lo[:4]), int(lo[5])
+    while (y, k) <= (int(hi[:4]), int(hi[5])):
+        out.append(f"{y}Q{k}")
+        y, k = (y + 1, 1) if k == 4 else (y, k + 1)
+    return out
+
+
+observed = sorted(q.quarter.unique())
+# The axis carries the UNOBSERVED quarters too. 2017-2020 was never fetched, and
+# if the axis simply skipped it, 2016Q4 would sit against 2021Q1 and the chart
+# would draw a continuous line across a four-year hole -- inventing a recovery
+# path nobody measured. The gap has to occupy its true width and be labelled.
+quarters = quarter_range(observed[0], observed[-1])
+missing = [x for x in quarters if x not in set(observed)]
+years = list(range(int(a.year.min()), int(a.year.max()) + 1))
 
 
 def col(g, idx, key, keys):
@@ -107,6 +122,11 @@ for t in ORDER:
                (gq.set_index("quarter").gold_oz_sold.reindex(quarters))],
         "aRev": col(ga, years, "year", "gold_revenue"),
         "l0": col(gq, quarters, "quarter", "L0a"), "aisc": col(gq, quarters, "quarter", "aisc_margin"),
+        "l0b": col(gq, quarters, "quarter", "L0b"),
+        # net income and total revenue so the page can aggregate L0b the same way
+        # it aggregates GAIM -- sum the parts, divide once
+        "ni": col(gq, quarters, "quarter", "net_income_attributable"),
+        "trev": col(gq, quarters, "quarter", "total_revenue"),
         "price": col(gq, quarters, "quarter", "realised_price"),
         "aL1": col(ga, years, "year", "L1"), "aL0": col(ga, years, "year", "L0a"),
         "aAisc": col(ga, years, "year", "aisc_margin"), "aPrice": col(ga, years, "year", "realised_price"),
@@ -118,12 +138,16 @@ for t in ORDER:
 
 payload = {
     "quarters": quarters, "years": [int(y) for y in years], "series": series,
+    "missing": missing, "observed": observed,
     "partialYear": int(a[~a.complete].year.max()) if (~a.complete).any() else None,
+    "missingYears": [y for y in range(min(years), max(years) + 1) if y not in set(years)],
     "meanGap": round((q.aisc_margin - q.L1).mean(), 1),
     "meanAisc": round(q.aisc_margin.mean(), 1), "meanGaim": round(q.L1.mean(), 1),
     "n": len(q), "nCo": q.ticker.nunique(),
 }
 (ROOT / "charts").mkdir(exist_ok=True)
 (ROOT / "charts/data.json").write_text(json.dumps(payload, ensure_ascii=False))
-print(f"quarters {len(quarters)}  years {len(years)}  series {len(series)}  "
+print(f"axis quarters {len(quarters)} ({len(observed)} observed, {len(missing)} unfetched)  "
+      f"years {len(years)}  series {len(series)}  "
       f"partial year {payload['partialYear']}  mean gap {payload['meanGap']}")
+print(f"unfetched span: {missing[0]}..{missing[-1]}" if missing else "no gap")

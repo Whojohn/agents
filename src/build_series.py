@@ -43,7 +43,12 @@ DEFAULT_BASIS = ("segment_revenue_gold", "segment_revenue_gold")
 # revenue. This is a derivation from a published number, not an estimate, and it is
 # flagged on every row it touches — without it those quarters carry no tax at all
 # and GAIM reads several points too high.
-ANNUAL_CASH_TAX = {"NEM": {2021: 1534, 2022: 1122, 2023: 794}}
+ANNUAL_CASH_TAX = {"NEM": {2013: 361, 2014: 187, 2015: 223, 2016: 85,
+                           2021: 1534, 2022: 1122, 2023: 794}}
+# FY2015 is carried at 223 as originally filed. The FY2016 10-K restates the
+# continuing-operations comparative to 77 -- a difference that is the Batu Hijau
+# discontinued-operations reclassification, not a correction. The rest of the
+# 2015 row is on the as-filed basis, so the tax has to be too.
 
 # Cash-tax catch-up payments that the company itself attributes to a PRIOR year.
 # Agnico's Q1 2026 release states plainly: "Total cash taxes paid in the first
@@ -336,6 +341,7 @@ def main():
     cols = ["ticker", "quarter", "gold_revenue", "gold_oz_sold", "realised_price",
             "w_gold", "L0a", "L0b", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
+            "net_income_attributable", "impairment_charges",
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
             "panel_n_q", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",
