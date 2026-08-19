@@ -466,6 +466,17 @@ ANCHOR_P_BULL, ANCHOR_P_TROUGH = 2494.0, 1267.0
 LEGACY_A_EQUIVALENT = {
     ("AEM", "royalties"), ("KGC", "royalties"), ("NEM", "royalties"),
     ("AEM", "reclamation_accretion"),
+    # AU proven by experiment, not assumed. This list was built from
+    # DEGRADATION 1.1, which only ever assessed four companies, so AngloGold
+    # and Gold Fields defaulted to Tier D -- a silent zero-fill -- on a blank
+    # royalties line. That produced a headline claim that AngloGold's blanks
+    # were worth 3.9 to 4.6 points of overstated margin, the largest single
+    # defect in the panel. They were worth nothing. Extracting the real
+    # royalty figures for eight periods and subtracting them out of
+    # opcost_ex_dda moved GAIM on exactly ZERO rows, which is only possible if
+    # the royalties were already inside opcost. The blank was presentational.
+    # Gold Fields needs no entry: it populates royalties on all 32 rows.
+    ("AU", "royalties"), ("AU", "reclamation_accretion"),
 }
 
 # Some gaps are properties of the accounting standard, not of the filer, and
