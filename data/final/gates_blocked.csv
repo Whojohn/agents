@@ -1,7 +1,7 @@
 gate,column,present_for,n_rows
-annual reconciliation,fy_audited_gold_revenue,(none),0
-annual reconciliation,fy_audited_opcost_ex_dda,(none),0
-annual reconciliation,fy_audited_capex_total,(none),0
-annual reconciliation,fy_audited_cash_tax_paid,(none),0
-dual-source capex/tax,capex_ppe_additions,(none),0
-dual-source capex/tax,cash_tax_paid_alt,(none),0
+annual reconciliation,fy_audited_gold_revenue,AEM;AU;GFI;GOLD;KGC;NEM,47
+annual reconciliation,fy_audited_opcost_ex_dda,AEM;AU;GFI;GOLD;KGC;NEM,49
+annual reconciliation,fy_audited_capex_total,AEM;AU;GFI;GOLD;KGC;NEM,49
+annual reconciliation,fy_audited_cash_tax_paid,AEM;AU;GFI;GOLD;KGC;NEM,47
+dual-source capex/tax,capex_ppe_additions,AEM;AU;GFI;GOLD;KGC;NEM,153
+dual-source capex/tax,cash_tax_paid_alt,AEM;AU;GFI;GOLD;KGC;NEM,120

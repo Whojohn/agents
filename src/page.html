@@ -633,7 +633,8 @@ function renderStatic() {
     + D.eras.map(r => `<tr><td>${r.label}</td><td>${r.n}</td>`
       + `<td>${r.n_aisc}${r.n_aisc < r.n ? ` <span style="color:var(--warn)">(${r.n - r.n_aisc} 无)</span>` : ''}</td>`
       + `<td>${r.gaim.toFixed(2)}%</td>`
-      + `<td>${r.aisc.toFixed(2)}%</td><td>${r.gap.toFixed(1)}pt</td></tr>`).join('') + '</tbody>';
+      + `<td>${r.aisc == null ? `<span title="AISC 覆盖仅 ${r.aisc_cov}% 的收入，不足以与左侧 GAIM 比较">—</span>` : r.aisc.toFixed(2) + '%'}</td>`
+      + `<td>${r.gap == null ? '—' : r.gap.toFixed(1) + 'pt'}</td></tr>`).join('') + '</tbody>';
 
   const counts = Object.entries(D.gradeCounts).sort().map(([k, v]) => `${k} 级 ${v} 行`).join(' · ');
   document.getElementById('fidNote').innerHTML =

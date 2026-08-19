@@ -25,6 +25,9 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EPOCH = 2013
 AGG_MIN_PANEL = 4   # below this many companies in a bucket the aggregate is not drawn
+# Share of an era's gold revenue that must carry a published AISC before the
+# era's AISC margin is quoted at all. See the comment at the era loop.
+AISC_ERA_MIN_COVERAGE = 0.50
 
 q = pd.read_csv(ROOT / "data/final/margins.csv")
 a = pd.read_csv(ROOT / "data/final/margins_annual.csv")
@@ -106,6 +109,7 @@ META = {
         "opcost_src": "<b>Cost of sales</b> 附注。<b>权利金已含在其中</b>——见下。",
         "aisc_note": "<b>本公司的 AISC 利润率在 2013Q1–2022H2 整段被撤回、不予发布。</b>公布 AISC 的分母是<b>归属口径且含权益法合资企业</b>的盎司与收入，而我们的黄金收入是<b>合并口径、不含权益法</b>。2014Q4 6-K 原文：利润表「Gold income 1,278」、分部附注「Equity-accounted investments included above (142)」，而 AISC 附录是「Attributable gold income ... 1,407」÷「Attributable gold sold - oz (000) 1,171」，公司自报 Price received $1,202，我们算出来是 $1,091。拿归属口径的 AISC 去除合并口径的价格，利润率被压低 4.9–23.8 个百分点。正确的分母公司披露了，但尚未提取，因此<b>宁可留空也不发布一个已知错误的数</b>。2023Q1 起公司自身口径变更，两者一致，从该期起恢复发布。原公布 AISC 为<b>归属口径且包含权益法合资企业</b>，而收入与成本是合并口径。我们自建的对账式沿用本行自己的合并口径字段，因此与公司公布值之间存在<b>两个方向相反的已知缺口</b>：（1）用全部资本开支而非维持性资本开支（推高），（2）漏掉合资企业按比例的成本与资本开支加项（压低，且实测占优）。<b>残差未做调平，按算出来的原样报告。</b>",
         "quirks": [
+            "<b>2005–2010 的到手金价比现货低 8%–31%，这不是提取错误，是对冲盘。</b>本公司当年背着业内最大的黄金远期盘，按锁定价交货，2010 年 10 月 7 日才全部平掉。用伦敦金定盘价逐季对表：2005Q1–2010Q3 的偏离在 −8.1% 到 −30.9% 之间，<b>2010Q4 起收敛到 ±4% 以内</b>，拐点与平仓日期对得上。这 24 个季度里公司让渡了约 <b>26.5 亿美元</b>收入（相当于现货口径的 11.2%），自身 GAIM 因此从 13.40% 被压到 <b>2.45%</b>，差 10.9 个百分点。这是真实发生的经济损失，理应留在利润率序列里，但读 2005–2010 那段聚合线时必须知道四家成分股之一是在按 2003 年的价格卖金子——把本公司整体剔除，2005–2008 聚合 GAIM 由 1.89% 升到 3.07%，<b>即对冲盘对板块口径的拖累是 1.2 个百分点，那一段接近零的利润率主因仍是资本开支而非对冲</b>。",
             "<b>我曾两次断言这家公司空着的权利金与复垦列在静默漏掉成本、每行值 3.9–4.6 个百分点、是面板最大的单一缺陷。这是错的。</b>派去修它的任务从 Cost of sales 附注提出了 8 个期间的真实权利金再从营业成本里减掉，GAIM 变动的行数<b>为零</b>——证明权利金本来就在营业成本里面。错因是判定「哪些字段已被别行包含」的白名单只按四家公司标定过，安格鲁与金田从来不在其中。",
             "2016 年起停发独立季报：41 行中 13 行为<b>半年</b>观测，画在图上占六个月宽度，不拆成季度。",
             "Obuasi 于 2015Q2 重分类为终止经营且<b>前期未重述</b>，该处强制序列断点。",
@@ -269,17 +273,33 @@ for p in sorted(q.quarter.unique(), key=lambda s: span(s)[0]):
 # call unpublishable were sitting inside the headline number.
 kept = q[~q.is_outlier & q.in_headline_aggregate]
 eras = []
-for lo, hi, label in [(2013, 2016, "2013–2016 谷底"), (2017, 2020, "2017–2020 复苏"),
+# Five eras, not three. The 2005-2012 extraction doubles the window and it is
+# not one regime: gold ran 430 -> 870 through 2008 while cost inflation ran with
+# it, then 870 -> 1670 into the 2011 peak. Folding eight years into one row
+# would average a build-out cycle against a harvest cycle and report neither.
+for lo, hi, label in [(2005, 2008, "2005–2008 金价起飞"), (2009, 2012, "2009–2012 顶峰"),
+                      (2013, 2016, "2013–2016 谷底"), (2017, 2020, "2017–2020 复苏"),
                       (2021, 2026, "2021–2026 牛市")]:
     e = kept[(kept.quarter.str[:4].astype(int) >= lo) & (kept.quarter.str[:4].astype(int) <= hi)]
     gaim = (e.gold_revenue - e.gold_cost_total).sum() / e.gold_revenue.sum() * 100
     # Weight AISC over the revenue that HAS an AISC. Leaving AISC-less revenue in
     # the denominator silently scores those periods as a zero AISC margin.
     ea = e[e.aisc_margin.notna()]
-    aisc = (ea.aisc_margin * ea.gold_revenue).sum() / ea.gold_revenue.sum()
+    # ...and only report it at all when it covers enough of the era to be the
+    # same population as the GAIM beside it. AISC did not exist before the WGC
+    # guidance note of June 2013: the whole 2005-2008 era has zero AISC rows,
+    # and 2009-2012 has exactly three (Barrick's retroactive 2011Q4/2012Q4 and
+    # Newmont's voluntary 2012Q4). Dividing those three into the era printed
+    # "AISC 42.5%, gap 32.1pt" next to a GAIM built from 68 observations -- two
+    # different samples subtracted from each other and labelled a gap.
+    cov = ea.gold_revenue.sum() / e.gold_revenue.sum() if len(e) else 0.0
+    aisc = ((ea.aisc_margin * ea.gold_revenue).sum() / ea.gold_revenue.sum()
+            if cov >= AISC_ERA_MIN_COVERAGE else None)
     eras.append({"label": label, "lo": lo, "hi": hi, "n": len(e),
-                 "n_aisc": len(ea), "gaim": round(gaim, 2), "aisc": round(aisc, 2),
-                 "gap": round(aisc - gaim, 1)})
+                 "n_aisc": len(ea), "aisc_cov": round(cov * 100, 1),
+                 "gaim": round(gaim, 2),
+                 "aisc": None if aisc is None else round(aisc, 2),
+                 "gap": None if aisc is None else round(aisc - gaim, 1)})
 
 payload = {
     "epoch": EPOCH,
@@ -325,5 +345,8 @@ print(f"series {len(series)}  observations {payload['n']}  "
 print(f"grades {payload['gradeCounts']}  A/B rows {payload['nAB']}  "
       f"outliers {payload['nOutlier']}  bias mean {payload['biasMean']}pt")
 for e in eras:
+    aisc_txt = ("     n/a" if e['aisc'] is None else f"{e['aisc']:6.2f}%")
+    gap_txt = (f"(AISC 覆盖 {e['aisc_cov']}% 的收入, {e['n_aisc']} 行 -- 不报)"
+               if e['gap'] is None else f"gap {e['gap']:.1f}pt")
     print(f"  {e['label']}  n={e['n']:3d}  GAIM {e['gaim']:6.2f}%  "
-          f"AISC {e['aisc']:6.2f}%  gap {e['gap']:.1f}pt")
+          f"AISC {aisc_txt}  {gap_txt}")
