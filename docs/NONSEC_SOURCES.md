@@ -19,7 +19,11 @@
 年报分部附注里矿产金（"金锭"分部）和贸易/冶炼金是两个独立披露的分部，此前被认为难以分离
 的东西其实是分开的。真正拿不到东西的只有两处：**Nordgold 从 FY2022 起彻底停止发布财务
 报表**，以及**Polymetal International 的官网已经完全打不开**（连 jina.ai 代理都打不开，
-是本轮唯一一个连兜底方案都失败的信源）。
+是本轮唯一一个连兜底方案都失败的信源）。此外协调方追加了一项范围核查：加拿大证券监管
+系统 **SEDAR+ 用三种独立方法（直连、jina.ai 代理、无头浏览器）测试全部失败**，但绕开
+它之后发现 **Barrick 自己的官网就藏着一份从 1998 年到 2025 年、完整不断的年报全集**，
+比 EDGAR 的 2002 年下限提前了 3 年以上——只是目前只坐实了年度颗粒度，协调方设想的
+"季度颗粒度回溯"没有得到验证，详见第 7 节。
 
 ---
 
@@ -239,9 +243,80 @@ Resources"的重组，新公司 Solidcore 自己的官网（`solidcore-resources
 
 ---
 
-## 7. 文件清单
+## 7. 补充范围：SEDAR+ 与 1997–2002 年加拿大公司回溯窗口
 
-- `data/universe/nonsec_sources.csv`——本文件依据的全部 14 行原始核查记录，字段：
+任务过程中协调方追加了一项范围：SEC EDGAR 对"外国私人发行人"（foreign private issuer，
+包括几乎所有加拿大矿商）直到 2002 年 11 月才强制要求电子化 EDGAR 申报，此前是纸质申报，
+EDGAR 上只留下元数据存根，没有实际财报——这意味着 Barrick、Kinross、Agnico Eagle、
+Placer Dome 这些加拿大公司在 EDGAR 上的可用历史起点比想象中晚了好几年。协调方要求核查
+能否用加拿大的 SEDAR+（`www.sedarplus.ca`，加拿大证券监管机构的电子化持续披露系统，
+自 1997 年起保有加拿大公司的披露记录）把这几家公司的窗口往前推。
+
+### 7.1 SEDAR+ 本身：三种方法全部验证失败
+
+本轮用三种独立方法测试了 SEDAR+ 的可连通性，**结论是从本沙箱环境完全拿不到**：
+
+1. **普通 curl + 浏览器 User-Agent**：返回 HTTP 403，响应体是一个带"Transaction ID"的
+   拦截页，响应头 `server: rdwr`——这是 Radware 机器人防护产品的标志。
+2. **`r.jina.ai` 代理**：**能绕过这层 403 拦截**（返回 200），但拿到的内容只有网站页脚和
+   版权信息——因为 SEDAR+ 的检索界面是一个纯前端渲染的 Angular 单页应用，jina.ai 的阅读器
+   不会执行页面里发起检索请求的 JavaScript，所以即使突破了防护墙，**拿到的也是一个空壳，
+   没有任何实际的备案文件数据**。
+3. **无头 Chromium（Playwright，可执行文件在 `/opt/pw-browsers/chromium`）**：按协调方
+   建议，用真实浏览器引擎、走沙箱代理、加了反自动化检测标志（伪装 `navigator.webdriver`、
+   `--disable-blink-features=AutomationControlled`）连续尝试两次，**结果是
+   `net::ERR_CONNECTION_RESET`**——连接在 TCP 层直接被重置，而且沙箱代理自己的失败日志里
+   完全没有记录到这几次请求，说明 Radware 在代理转发到 SEDAR+ 源站之后、TLS 握手完成之前
+   就把连接掐断了，比 curl 遇到的那层拦截更强，是本轮防护等级最高的一次拦截。
+
+三种方法的失败原因互不相同（普通请求被识别为爬虫拦截、jina 代理绕得过防护墙但读不到
+JS 渲染的内容、无头浏览器被更深层的行为指纹拦下），交叉验证之后可以确定：**SEDAR+
+不是"这次没搜到"，而是这套沙箱环境目前完全没有能打开它的手段**，需要向上报告这个限制，
+而不是继续换方法硬试。
+
+### 7.2 退而求其次：公司自己的官网反而是更好的信源
+
+SEDAR+ 走不通之后，按协调方指示测试了公司自己的 IR 官网和 annualreports.com 镜像站作为
+备选，结果**好坏参半，但好的那一半效果超出预期**：
+
+- **Barrick——本轮最有价值的发现**。Barrick 自己的官网（`barrick.com`，实际文件托管在
+  `s25.q4cdn.com/322814910/`）保留着一份**从 1998 财年到 2025 财年、连续不断、可以直接
+  下载的年报全集**，本轮实际抽查下载验证了 1998、1999、2000 三个年份（均为 200 状态码、
+  合法 PDF），2001–2025 年份则通过页面文件列表确认了同一套 URL 规律但没有逐个重新下载。
+  这**比 EDGAR 的 2002 年下限整整提前了 3 年以上**，而且完全不需要走 SEDAR+，也不需要
+  jina.ai——直连即可，是本轮所有信源里访问体验最顺畅的一个。
+  
+  **但要澄清协调方原始假设里的一个环节**：这套官网年报库**只找到了年报（annual
+  report），没有找到 1998–2002 年这段时期的季度中报（interim/quarterly report）**——
+  按 Barrick 官网年报目录相同的 URL 规律试了几种猜测路径（如
+  `doc_financial/quarterly_reports/[年份]/...`），全部 404。也就是说，"用 SEDAR 把
+  1997–2002 窗口从年度粒度提升到季度粒度"这个协调方提出的设想，**本轮没有被证实**——
+  不是被证伪，是没找到能证实它的路径，因为唯一能查季度备案的地方（SEDAR+）本身连不上。
+  
+- **Kinross——一个诚实的"没找到"，不是"证明没有"**。找到了 Kinross 官网 IR 文件服务器
+  的地址（`s204.q4cdn.com/896213035/`，用 2019–2020 年的新闻稿 PDF 链接反推确认过这个
+  ID 是对的），但按 Barrick 那套路径规律去猜 1999–2001 年年报的 URL，**全部 404**；
+  第三方镜像站 annualreports.com 上 Kinross 的年报列表**只回溯到 2005 年**，同样够不到
+  1997–2002 这段窗口。这不代表 Kinross 早年的年报不存在或拿不到——很可能只是 Kinross
+  的 IR 网站文件组织方式和 Barrick 不一样，需要换一种检索思路（比如站内搜索、或者直接
+  联系 IR 部门），本轮时间预算内没有走到这一步，**如实标记为"未确定"，不归入"不可行"**。
+- Agnico Eagle、Placer Dome 只做了最粗浅的检查（annualreports.com 镜像页），Agnico
+  Eagle 镜像只回溯到 2007 年，Placer Dome 页面直接跳转（该公司 2006 年被 Barrick 收购
+  后从三方镜像站下架），两者都**远没有到可以下结论的核实深度**。
+
+### 7.3 对研究窗口的实际影响
+
+协调方提出的"加拿大公司在国内按季度披露中期报告，SEC 记录却只有年度"这个不对称现象，
+**方向是对的，但本轮未能验证其在 1997–2002 具体这几年是否真的落地为可获取的季度文件**——
+SEDAR+ 本身连不上，Barrick 官网只交出了年度颗粒度。如果研究最终决定要把 2005 年之前的
+窗口纳入，目前唯一坐实可行的做法是：**用 Barrick 官网的年报全集把 Barrick 一家公司的
+窗口从 2002 年推到 1998 年**（年度频率），其余三家（Kinross、Agnico Eagle、Placer
+Dome）以及"季度粒度"这个更高的目标，都需要下一轮专门检索才能有结论。
+
+
+
+- `data/universe/nonsec_sources.csv`——本文件依据的全部 17 行原始核查记录（14 家非 SEC
+  公司/上市地 + SEDAR+ 平台本身 + Barrick/Kinross 两家的 1997–2002 回溯专项核查），字段：
   `company, venue, archive_url, retrievable_from_sandbox, earliest_year,
   frequency_by_era, language, format, currency, accounting_standard,
   gold_revenue_separable, cost_metric, missing_line_items, break_years, notes`。
@@ -259,4 +334,10 @@ Resources"的重组，新公司 Solidcore 自己的官网（`solidcore-resources
 3. 趁 Newcrest 历史文件还挂在 Newmont 的 IR 服务器上，尽快把 FY2005–2023 全部年报
    下载并本地归档，不要依赖这个链接长期可用；
 4. 评估是否值得为 Polymetal International 2007–2022 年的历史数据投入专门的镜像站
-   拼凑工作，还是把研究窗口对该公司限定为 Solidcore 2023 年至今。
+   拼凑工作，还是把研究窗口对该公司限定为 Solidcore 2023 年至今；
+5. 换一种检索思路（站内搜索/联系 IR）把 Kinross、Agnico Eagle、Placer Dome 的
+   1997–2002 年年报补齐，并专门查证这几年是否存在可获取的季度中期报告（本轮只坐实了
+   Barrick 一家的年度颗粒度回溯，季度颗粒度这个更高目标完全没有验证）；
+6. SEDAR+ 本身不建议再投入时间去正面突破——三种独立方法（直连、jina.ai、无头浏览器）
+   全部失败，继续换手段的边际收益很低，除非能拿到官方 API 权限或者付费数据供应商
+   （如 S&P Capital IQ、Refinitiv）的 SEDAR 镜像。
