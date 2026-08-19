@@ -371,10 +371,15 @@ def flag_outliers(panel):
     Needs the full cross-section: whether a reading is anomalous or simply what
     the industry did that quarter is only answerable by looking at the others.
     """
-    # Group on the period STRING, which already separates 2021Q1 from 2021H1 --
-    # but assert it, because a half-yearly row silently landing in a quarterly
-    # cross-section would be compared against a period of twice its length.
-    assert panel.groupby("quarter").freq.nunique().max() <= 1, "mixed frequency in one period"
+    # Group on the period STRING, which already separates 2021Q1 from 2021H1.
+    # The old guard here asserted that each period holds one freq -- but freq is
+    # DERIVED from the period string, so it could never fail and protected
+    # nothing. The failure it was reaching for is a row whose label says one
+    # length and whose months column says another, which is a real thing an
+    # extraction agent can produce. Check that instead.
+    bad = panel[panel.months != panel.quarter.str[4].map({"Q": 3, "H": 6})]
+    assert bad.empty, ("period label disagrees with months column: "
+                       + str(bad[["ticker", "quarter", "months"]].to_dict("records")[:5]))
     med = panel.groupby("quarter").L1.transform("median")
     panel["L1_median_q"] = med
     panel["L1_dev"] = panel.L1 - med
@@ -389,6 +394,55 @@ def flag_outliers(panel):
         & (panel.L1_dev.abs() > GAIM_OUTLIER_MIN_PT)
         & (panel.panel_n_q >= GAIM_OUTLIER_MIN_PANEL)
     ).fillna(False)
+
+    # ---- half-year rows are tested at half-year frequency -------------------
+    # Only Gold Fields and AngloGold file twice a year, so a half-year period
+    # holds one or two companies -- always below GAIM_OUTLIER_MIN_PANEL. Every
+    # one of the 33 half-year observations was therefore STRUCTURALLY exempt
+    # from trimming while 14 of 256 quarterly rows were excluded, and the
+    # exemption landed precisely on the two companies with the worst fidelity
+    # grades. 2005-2012 makes it worse: Gold Fields files half-yearly for the
+    # whole span.
+    #
+    # The fix is not to lower the floor -- an outlier genuinely is not
+    # identifiable in a panel of two. It is to give those rows a real
+    # cross-section by folding each quarterly filer's two quarters into one
+    # half-year figure. Aggregating quarters INTO a half is allowed; it is
+    # SPLITTING a half into quarters that the methodology forbids. Every
+    # observation is then judged against a panel built at its own frequency.
+    panel["_half"] = (panel.quarter.str[:4] + "H"
+                      + np.where(panel.quarter.str[4] == "H", panel.quarter.str[5],
+                                 np.where(panel.quarter.str[5].astype(int) <= 2, "1", "2")))
+    fold = (panel.assign(_rw=panel.L1 * panel.gold_revenue)
+                 .groupby(["_half", "ticker"])
+                 .agg(_rw=("_rw", "sum"), _rev=("gold_revenue", "sum"),
+                      _mon=("months", "sum"), _n=("L1", "count")))
+    # A company enters the half-year cross-section only if it actually covers
+    # the whole half. A single reported quarter is not a half-year observation.
+    fold = fold[(fold._mon == 6) & (fold._n > 0)]
+    fold["_g"] = fold._rw / fold._rev
+    grp = fold.groupby("_half")._g
+    hstat = pd.DataFrame({
+        "_hmed": grp.transform("median"),
+        "_hn": grp.transform("count"),
+    })
+    hstat["_hdev"] = fold._g - hstat._hmed
+    hstat["_hscale"] = hstat.groupby(level=0)._hdev.transform(
+        lambda x: np.median(np.abs(x.dropna())) * 1.4826 if x.notna().any() else np.nan)
+
+    isH = panel.freq == "H"
+    if isH.any():
+        key = pd.MultiIndex.from_arrays([panel.loc[isH, "_half"], panel.loc[isH, "ticker"]])
+        for col, src in (("L1_median_q", "_hmed"), ("L1_scale_q", "_hscale"),
+                         ("panel_n_q", "_hn")):
+            panel.loc[isH, col] = hstat[src].reindex(key).to_numpy()
+        panel.loc[isH, "L1_dev"] = panel.loc[isH, "L1"] - panel.loc[isH, "L1_median_q"]
+        panel.loc[isH, "is_outlier"] = (
+            (panel.loc[isH, "L1_dev"].abs() > GAIM_OUTLIER_K * panel.loc[isH, "L1_scale_q"])
+            & (panel.loc[isH, "L1_dev"].abs() > GAIM_OUTLIER_MIN_PT)
+            & (panel.loc[isH, "panel_n_q"] >= GAIM_OUTLIER_MIN_PANEL)
+        ).fillna(False)
+    panel = panel.drop(columns=["_half"])
 
     # Diagnostics only -- these gate nothing now, but a reader still wants to see
     # when the industry as a whole was running costs against the gold price.
