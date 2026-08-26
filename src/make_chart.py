@@ -111,7 +111,7 @@ META = {
         "quirks": [
             "<b>2005–2010 的到手金价比现货低 8%–31%，这不是提取错误，是对冲盘。</b>本公司当年背着业内最大的黄金远期盘，按锁定价交货，2010 年 10 月 7 日才全部平掉。用伦敦金定盘价逐季对表：2005Q1–2010Q3 的偏离在 −8.1% 到 −30.9% 之间，<b>2010Q4 起收敛到 ±4% 以内</b>，拐点与平仓日期对得上。这 24 个季度里公司让渡了约 <b>26.5 亿美元</b>收入（相当于现货口径的 11.2%），自身 GAIM 因此从 13.40% 被压到 <b>2.45%</b>，差 10.9 个百分点。这是真实发生的经济损失，理应留在利润率序列里，但读 2005–2010 那段聚合线时必须知道四家成分股之一是在按 2003 年的价格卖金子——把本公司整体剔除，2005–2008 聚合 GAIM 由 1.89% 升到 3.07%，<b>即对冲盘对板块口径的拖累是 1.2 个百分点，那一段接近零的利润率主因仍是资本开支而非对冲</b>。",
             "<b>我曾两次断言这家公司空着的权利金与复垦列在静默漏掉成本、每行值 3.9–4.6 个百分点、是面板最大的单一缺陷。这是错的。</b>派去修它的任务从 Cost of sales 附注提出了 8 个期间的真实权利金再从营业成本里减掉，GAIM 变动的行数<b>为零</b>——证明权利金本来就在营业成本里面。错因是判定「哪些字段已被别行包含」的白名单只按四家公司标定过，安格鲁与金田从来不在其中。",
-            "2016 年起停发独立季报：41 行中 13 行为<b>半年</b>观测，画在图上占六个月宽度，不拆成季度。",
+            "2016 年起停发独立季报：{nRows} 行中 {nHalf} 行为<b>半年</b>观测，画在图上占六个月宽度，不拆成季度。",
             "Obuasi 于 2015Q2 重分类为终止经营且<b>前期未重述</b>，该处强制序列断点。",
             "Sukari 金矿按 <b>100% 合并</b>，而安格鲁只持有 50%。",
             "2023 年迁册英国，CIK 由 1067428 变为 1973832，取数需缝合双 CIK。",
@@ -125,7 +125,7 @@ META = {
         "opcost_src": "<b>Cost of sales</b>，为<b>含公司管理费的总额</b>口径。",
         "aisc_note": "AISC 与 AIC 均按 WGC 口径公布，但 H2 的每盎司数多数由「全年减上半年」倒算。Cerro Corona 用<b>黄金当量盎司</b>，内嵌一个漂移的价格比。",
         "quirks": [
-            "<b>本组唯一的半年度申报人</b>：32 行中 20 行为半年观测。这是把整个面板的聚合频率定在半年的原因——把金田拆成季度就是方法论明令禁止的插值。",
+            "<b>本组唯一的半年度申报人</b>：{nRows} 行中 {nHalf} 行为半年观测。这是把整个面板的聚合频率定在半年的原因——把金田拆成季度就是方法论明令禁止的插值。",
             "<b>公司管理费追不到出处。</b>六个数值散落三份文件，没有一处有科目标题。已从成本堆栈中撤出，另存 <code>corporate_g_and_a_unsourced</code> 列并打 <code>PROVENANCE_UNRESOLVED</code>。撤出使金田 GAIM <b>上升</b>约 1.73 个百分点——这是对我们有利的方向，故明说。",
             "另有 21 行在一个<b>描述性</b>标志里写明营业成本是含管理费的总额，但没有任何代码读那个标志。已将其中 17 行转为机器可读的 <code>TIERAEQ:corporate_g_and_a:BUNDLED_IN_OPCOST_GROSS</code>。",
             "2013 年两行的营业成本原为「净额」口径，重述为总额后，管理费与复垦成为<b>备查子集</b>，若再相加即双重计算，故单独存放。",
@@ -335,9 +335,53 @@ for e in eras:
         "pxoz": round(z.gold_revenue.sum() / oz * 1e6, 0),
     })
 
+# Counts inside the per-company prose are DENOMINATORS, and a denominator
+# typed into a string is a number no rebuild can correct. Two had already gone
+# stale the moment the panel doubled: AngloGold read "41 rows, 13 of them
+# half-year" against a panel now holding 73, and Gold Fields "32 rows, 20 of
+# them" against 64. The numerators were still right, which is what makes this
+# kind of rot hard to see. Substituted from the panel instead, so the next
+# extraction cannot leave them behind.
+for _s in series:
+    _g = q[q.ticker == _s["id"]]
+    _fill = {"nRows": len(_g), "nHalf": int((_g.freq == "H").sum()),
+             "nQ": int((_g.freq == "Q").sum()), "nA": int((_g.freq == "A").sum())}
+    _s["quirks"] = [k.format(**_fill) if "{n" in k else k for k in _s["quirks"]]
+
+# ------------------------------------------------------------------ sources
+# Every figure's filing, with a URL that downloads it and a digest that proves
+# which bytes were read. build_sources.py does the joining and the checking;
+# this only reshapes its output for the page. Two levels, because 576 documents
+# repeated across 760 observation references would be a third of the payload
+# spent on duplicate strings: the file table is the list, and each observation
+# points at it by index.
+src_files = pd.read_csv(ROOT / "data/final/来源清单_文件.csv")
+src_obs = pd.read_csv(ROOT / "data/final/来源清单_观测.csv")
+idx = {p: i for i, p in enumerate(src_files.local_path)}
+srcRows = [[r.ticker, r.form, str(r.filing_date), str(r.report_date),
+            r.accession, r.exhibit_filename, int(r.bytes), r.sha256, r.url,
+            len(str(r.used_for).split(";"))]
+           for r in src_files.itertuples()]
+srcMap = {}
+for r in src_obs.itertuples():
+    srcMap.setdefault(f"{r.ticker}|{r.quarter}", []).append(idx[r.local_path])
+
 payload = {
     "epoch": EPOCH,
     "recon": recon,
+    "srcRows": srcRows, "srcMap": srcMap,
+    # The footer used to hardcode "280 testable, 39 outside" and to assert the
+    # panel begins in 2013Q1 with 2005-2012 "not yet extracted". Both were true
+    # when written and neither is now. Numbers a reader is asked to trust cannot
+    # be typed by hand into prose that no rebuild touches.
+    "reconN": int(q.recon_residual_calc.notna().sum()),
+    "reconBad": int((q.recon_residual_calc.abs() > 2).sum()),
+    "reconWho": (q[q.recon_residual_calc.abs() > 2].groupby("ticker")
+                  .recon_residual_calc.agg(n="size", worst=lambda x: round(x.abs().max(), 1))
+                  .reset_index().to_dict("records")),
+    "srcNFile": len(src_files), "srcNRef": len(src_obs),
+    "srcNAcc": int(src_files.accession.nunique()),
+    "srcForms": src_files.form.value_counts().to_dict(),
     # Both ends, not just the far one. The front end used to scale x as
     # m / xmax, which silently assumes the series starts at the epoch. It did
     # while the panel began in 2013Q1 (x0 = 0). The 2005-2012 extraction makes

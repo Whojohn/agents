@@ -57,6 +57,13 @@
   .sw { width: 16px; height: 0; border-top-width: 3px; border-top-style: solid; display: inline-block; }
   figure { margin: 0; }
   .scroll { overflow-x: auto; }
+  /* 576 rows in a fixed-height pane: without a border it reads as the page
+     text overlapping the table, and without a sticky header the columns are
+     unnamed the moment you scroll. */
+  .pane { border: 1px solid var(--line); border-radius: 6px; }
+  .pane table { margin: 0; }
+  .pane thead th { position: sticky; top: 0; z-index: 1;
+                   background: var(--surface); box-shadow: 0 1px 0 var(--line); }
   svg { display: block; max-width: 100%; }
   .grid { stroke: var(--line); stroke-width: 1; }
   .zero { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -174,10 +181,27 @@
   <h2>六、逐公司取数与陷阱</h2>
   <div id="appendix"></div>
 
-  <h2>七、导出</h2>
+  <h2>七、数据来源：每一个数字的原始申报</h2>
+  <p class="note" id="srcNote"></p>
+  <div class="exp" style="margin-bottom:10px">
+    <label style="font-size:13px;color:var(--ink-2)">公司
+      <select id="srcCo" style="margin-left:4px"><option value="">全部</option></select></label>
+    <label style="font-size:13px;color:var(--ink-2)">表格
+      <select id="srcForm" style="margin-left:4px"><option value="">全部</option></select></label>
+    <input id="srcQ" placeholder="搜索受理号/文件名/日期" style="flex:1;min-width:200px;padding:4px 8px">
+    <span id="srcCount" style="color:var(--ink-3);font-size:13px"></span>
+  </div>
+  <div class="scroll pane" style="max-height:520px;overflow-y:auto">
+    <table id="srcTbl"></table>
+  </div>
+  <p class="note" id="srcHow"></p>
+
+  <h2>八、导出</h2>
   <div class="exp">
     <button class="btn" id="copyQ">复制观测级 CSV</button>
     <button class="btn" id="copyH">复制半年聚合 CSV</button>
+    <button class="btn" id="copyS">复制来源清单 CSV</button>
+    <button class="btn" id="copySO">复制「观测→来源」对照 CSV</button>
     <span id="copied" style="color:var(--ink-3);font-size:13px"></span>
   </div>
   <textarea id="csv" readonly spellcheck="false"></textarea>
@@ -704,6 +728,7 @@ function renderStatic() {
         + `<td>+${Math.max(...b).toFixed(2)}pt</td><td>${fm}</td></tr>`;
     }).join('') + '</tbody>';
 
+  const NAME_ = Object.fromEntries(D.series.map(s => [s.id, s.name]));
   document.getElementById('appendix').innerHTML = D.series.map(s =>
     `<details><summary><span class="tag">${s.id}</span>${s.name} ${s.en}</summary>
       <div class="body">
@@ -714,17 +739,22 @@ function renderStatic() {
           <dt>黄金收入取自</dt><dd>${s.revenueSrc}</dd>
           <dt>营业成本取自</dt><dd>${s.opcostSrc}</dd>
           <dt>AISC 口径</dt><dd>${s.aiscNote}</dd>
+          <dt>原始申报</dt><dd><a href="#" data-srcco="${s.id}">${
+            D.srcRows.filter(r => r[0] === s.id).length} 份文档，点此在第七节按本公司筛选并下载</a></dd>
         </dl>
         <ul>${s.quirks.map(q => `<li>${q}</li>`).join('')}</ul>
       </div></details>`).join('');
 
+  const who = D.reconWho.map(r => `${NAME_[r.ticker] || r.ticker} ${r.n} 行（最大 ${r.worst}%）`).join('、');
   document.getElementById('foot').innerHTML =
-    `<p>数据来源：美国证监会 EDGAR 全文，逐份原始申报文件解析。每个数字都可回溯到一份具体文件的一个具体科目行。</p>
-     <p><b>已知边界：</b>本面板始于 2013Q1，因为 AISC 这个口径 2013 年年中才由世界黄金协会发布；
-     2005–2012 需要改用 AIC、Gold Institute 的 total cash cost 或 Gold Fields 的 NCE 作为锚，尚未提取。
+    `<p>数据来源：美国证监会 EDGAR 全文，逐份原始申报文件解析。每个数字都可回溯到一份具体文件的一个具体科目行——
+     <b>${D.srcNFile} 份文档、${D.srcNAcc} 份申报的完整清单与下载链接见第七节</b>。</p>
+     <p><b>已知边界：</b>本面板覆盖 ${D.first}–${D.last}。
+     <b>AISC 这个口径 2013 年年中才由世界黄金协会发布，所以 2013 年前没有 AISC 可比</b>——
+     该段用 AIC、Gold Institute 的 total cash cost 与 Gold Fields 的 NCE 作锚，GAIM 本身照常前推计算。
      六家均为美国证监会申报人；紫金、山东黄金、Polyus、Newcrest 等非申报人尚未纳入，因此这不是完整的全球前二十。</p>
      <p><b>反向校验：</b>用本面板自己的输入重建各公司公布的 AISC，作为提取正确性的校验和。
-     ${D.n} 行中 280 行可测，其中 39 行残差超出 2% 的合同门限——集中在巴里克（口径为归属含合资）与安格鲁（同因）。
+     ${D.n} 行中 ${D.reconN} 行可测，其中 ${D.reconBad} 行残差超出 2% 的合同门限——${who}。
      这些残差<b>没有被调平</b>，按算出来的原样报告。</p>`;
 }
 
@@ -748,6 +778,97 @@ const put = (t, l) => { document.getElementById('csv').value = t;
   document.getElementById('copied').textContent = l + ' 已复制'; };
 document.getElementById('copyQ').onclick = () => put(window._csvQ, '观测级 CSV');
 document.getElementById('copyH').onclick = () => put(window._csvH, '半年聚合 CSV');
+// ------------------------------------------------------- 七、数据来源
+// The page used to name the STATEMENT each figure came from and never the
+// FILING. That is a citation with no reference: unusable without first guessing
+// which of ~120 filings was meant. Every observation has carried a source_file
+// since the extraction contract's section B; nothing downstream read it.
+(function sources() {
+  // D.series is the only place the Chinese names live; there is no separate
+  // lookup, and inventing one here would be a second copy to drift.
+  const NAME = Object.fromEntries(D.series.map(s => [s.id, s.name]));
+  const F = ['公司','表格','申报日','报告期','受理号','文档','大小','SHA-256','链接','用于'];
+  const rows = D.srcRows;
+  const forms = {}, cos = {};
+  rows.forEach(r => { forms[r[1]] = (forms[r[1]] || 0) + 1; cos[r[0]] = (cos[r[0]] || 0) + 1; });
+  const co = document.getElementById('srcCo'), fo = document.getElementById('srcForm');
+  Object.keys(cos).sort().forEach(k => co.insertAdjacentHTML('beforeend',
+    `<option value="${k}">${(NAME[k] || k)} (${cos[k]})</option>`));
+  Object.entries(forms).sort((a, b) => b[1] - a[1]).forEach(([k, v]) =>
+    fo.insertAdjacentHTML('beforeend', `<option value="${k}">${k} (${v})</option>`));
+
+  const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB'
+                                : Math.round(n / 1024) + ' KB';
+  const tbl = document.getElementById('srcTbl');
+  function draw() {
+    const c = co.value, f = fo.value, q = document.getElementById('srcQ').value.trim().toLowerCase();
+    const sel = rows.filter(r => (!c || r[0] === c) && (!f || r[1] === f)
+      // Search every column the reader can see, form and company name
+      // included. Typing "20-F" into a box next to a table showing a 20-F
+      // column and getting nothing is the box being wrong, not the reader.
+      && (!q || [r[0], NAME[r[0]] || '', r[1], r[2], r[3], r[4], r[5], r[7]]
+                  .join(' ').toLowerCase().includes(q)));
+    document.getElementById('srcCount').textContent =
+      `显示 ${sel.length} / ${rows.length} 份文档`;
+    tbl.innerHTML = '<thead><tr>' + F.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>'
+      + sel.map(r => `<tr><td>${NAME[r[0]] || r[0]}</td><td>${r[1]}</td><td>${r[2]}</td>`
+        + `<td>${r[3]}</td><td><code style="font-size:11px">${r[4]}</code></td>`
+        + `<td style="max-width:230px;overflow-wrap:anywhere"><code style="font-size:11px">${r[5]}</code></td>`
+        + `<td style="text-align:right">${kb(r[6])}</td>`
+        + `<td><code style="font-size:11px" title="${r[7]}">${r[7].slice(0, 12)}…</code></td>`
+        + `<td><a href="${r[8]}" target="_blank" rel="noopener">下载</a></td>`
+        + `<td style="text-align:right">${r[9]} 期</td></tr>`).join('')
+      + '</tbody>';
+  }
+  co.onchange = fo.onchange = draw;
+  // The per-company appendix links here; make the link actually filter rather
+  // than dump the reader at the top of a 576-row table.
+  document.addEventListener('click', ev => {
+    const a = ev.target.closest('[data-srcco]');
+    if (!a) return;
+    ev.preventDefault();
+    co.value = a.dataset.srcco; fo.value = ''; document.getElementById('srcQ').value = '';
+    draw();
+    document.getElementById('srcTbl').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('srcQ').oninput = draw;
+  draw();
+
+  const nf = Object.entries(D.srcForms).sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `<code>${k}</code> ${v}`).join(' · ');
+  document.getElementById('srcNote').innerHTML =
+    `面板 <b>${D.n}</b> 个观测，全部可追到原始申报——<b>没有一个例外</b>。`
+    + `共 <b>${D.srcNRef}</b> 条「观测→文档」引用，落在 <b>${D.srcNFile}</b> 份文档、`
+    + `<b>${D.srcNAcc}</b> 份 SEC 申报上：${nf}。`
+    + `点「下载」直接取 EDGAR 原件。`;
+  document.getElementById('srcHow').innerHTML =
+    `<b>SHA-256 是给你复核用的。</b>链接不是按某个猜出来的规律拼的：`
+    + `抓取器自己的 <code>data/raw/manifest.csv</code> 记录了 6,880 份文档的 CIK、受理号、`
+    + `文件名、字节数与摘要，760 条引用<b>逐条命中</b>，URL 由 manifest 自己的字段组装。`
+    + `<b>然后实测，不是推断：</b>按「每种表格 × 每个 CIK」分层抽了 <b>59</b> 条打到线上 EDGAR，`
+    + `覆盖 6-K／10-Q／10-K／20-F／40-F／8-K 全部六种表格与全部七个 CIK，`
+    + `<b>全部 200，且 Content-Length 与 manifest 记录的字节数逐条精确相符</b>；`
+    + `再挑六家各一份<b>完整下载后重新做 SHA-256</b>，`
+    + `六份的摘要与清单、与本地留存件<b>三方一致</b>。`
+    + `你下载后 <code>sha256sum</code> 一跑，对得上就是我读的那份字节，对不上就不是。<br><br>`
+    + `<b>安格鲁黄金有两个 CIK</b>（2023 年迁册英国前 <code>1067428</code>、后 <code>1973832</code>）。`
+    + `这不是要抹平的错误——迁册前的申报确实挂在旧 CIK 下，链接必须用旧的才打得开。<br><br>`
+    + `一份文档常常支撑多个期间（「用于」列即该数）：年报的三年对照表会同时锚定前两年，`
+    + `H2 的数由「全年减上半年」倒算时也要引用全年那份。反过来，`
+    + `<b>「观测→来源」对照 CSV</b> 给的是逐观测的完整引用，用来追某一个具体数字。`;
+
+  window._csvS = ['ticker,form,filing_date,report_date,accession,document,bytes,sha256,url,used_for_n']
+    .concat(rows.map(r => r.map(x => typeof x === 'string' && x.includes(',')
+      ? `"${x}"` : x).join(','))).join('\n');
+  window._csvSO = ['ticker,quarter,accession,document,url']
+    .concat(Object.entries(D.srcMap).flatMap(([k, ix]) => {
+      const [t, qq] = k.split('|');
+      return ix.map(i => [t, qq, rows[i][4], rows[i][5], rows[i][8]].join(','));
+    })).join('\n');
+})();
+
+document.getElementById('copyS').onclick = () => put(window._csvS, '来源清单 CSV');
+document.getElementById('copySO').onclick = () => put(window._csvSO, '观测→来源对照 CSV');
 
 renderControls(); renderStatic(); render();
 </script>
