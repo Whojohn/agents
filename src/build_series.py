@@ -245,6 +245,15 @@ def load_company(path):
     d["L0a"] = (rev - site_cost - d.segment_dda.fillna(0)) / rev * 100
     d["L1"] = (rev - site_cost - group_cost) / rev * 100
 
+    # Two of the cost stack's components kept as their own columns, so the page
+    # can show a per-ounce decomposition without re-deriving the allocation and
+    # risking a second, differently-weighted version of the same number. These
+    # are the two that move: site cost and total capex are 84% of the stack in
+    # 2005-2008 and they are what the "gold went up, why didn't margins" answer
+    # turns on.
+    d["gold_cost_site"] = site_cost
+    d["gold_cost_capex"] = d.capex_total.fillna(0) * d.w_gold
+
     # L0b -- company-level net margin, straight off the income statement. This is
     # the ONLY published layer that carries impairments, and in 2013-2015 the
     # impairments ARE the story: a deeply negative L0b is the correct reading of
@@ -944,6 +953,7 @@ def main():
             "w_gold", "L0a", "L0b", "L0b_adj", "aisc_margin", "L1", "L2", "L2_n", "published_aisc",
             "aisc_comparable", "aisc_basis_note", "gold_cost_total", "total_revenue",
             "net_income_attributable", "impairment_charges",
+            "gold_cost_site", "gold_cost_capex",
             "aisc_ratio", "is_outlier", "L1_median_q", "L1_dev", "L1_scale_q",
             "panel_n_q", "L2_months", "months", "sector_distress", "sector_breach_share",
             "sector_breach_n", "sector_testable_n",

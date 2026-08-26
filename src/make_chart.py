@@ -301,8 +301,43 @@ for lo, hi, label in [(2005, 2008, "2005–2008 金价起飞"), (2009, 2012, "20
                  "aisc": None if aisc is None else round(aisc, 2),
                  "gap": None if aisc is None else round(aisc - gaim, 1)})
 
+# ---------------------------------------------------------------- reconcile
+# Why the pre-2013 GAIM reads near zero in a period everyone remembers as a
+# bull market. The answer is not in GAIM at all, it is in the distance between
+# the layers: the segment accounting margin (what the market traded on) and the
+# attributable net margin (what shareholders actually got) are 26 points apart
+# in 2005-2008, and GAIM lands beside the SECOND one. L0b is net income over
+# total revenue straight off the income statement -- it touches none of the
+# GAIM cost stack -- so the two agreeing is a genuine independent check rather
+# than a restatement of the same arithmetic.
+recon = []
+for e in eras:
+    z = kept[(kept.quarter.str[:4].astype(int) >= e["lo"])
+             & (kept.quarter.str[:4].astype(int) <= e["hi"])]
+    tr, oz = z.total_revenue.sum(), z.gold_oz_sold.sum()
+    ni = z.net_income_attributable.sum()
+    # Blank is NOT zero here. Impairments were extracted for every company only
+    # from 2013; before that one to three companies carry a figure and the rest
+    # are unchecked. Adding back what was extracted therefore gives a FLOOR for
+    # the ex-impairment margin, never the number itself, and the coverage count
+    # travels with it so the table cannot be read as complete.
+    imp = z.impairment_charges.fillna(0).sum()
+    n_imp_co = z[z.impairment_charges.notna()].ticker.nunique()
+    recon.append({
+        "label": e["label"],
+        "l0a": round((z.L0a * z.gold_revenue).sum() / z.gold_revenue.sum(), 1),
+        "l0b": round(ni / tr * 100, 1),
+        "l0b_ex": round((ni + imp) / tr * 100, 1),
+        "gaim": e["gaim"],
+        "imp": round(imp, 0), "impCo": int(n_imp_co), "nCo": int(z.ticker.nunique()),
+        "opoz": round(z.gold_cost_site.sum() / oz * 1e6, 0),
+        "cxoz": round(z.gold_cost_capex.sum() / oz * 1e6, 0),
+        "pxoz": round(z.gold_revenue.sum() / oz * 1e6, 0),
+    })
+
 payload = {
     "epoch": EPOCH,
+    "recon": recon,
     # Both ends, not just the far one. The front end used to scale x as
     # m / xmax, which silently assumes the series starts at the epoch. It did
     # while the panel began in 2013Q1 (x0 = 0). The 2005-2012 extraction makes

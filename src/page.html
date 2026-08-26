@@ -159,6 +159,11 @@
   <p class="note">按黄金收入加权，已剔除离群观测，<b>并已剔除 X 级（不可发布）观测</b>——此前 <code>in_headline_aggregate</code> 是一个没有任何代码读取的列，22 个规则判定不可发布的观测一直坐在头条数字里。AISC 一列<b>只对确实有 AISC 的收入加权</b>：把没有 AISC 的收入留在分母，等于把那些期间当成 AISC 利润率为零。「其中有 AISC」一列就是这个覆盖差——2013–2022 的安格鲁黄金整段被撤回（见下方该公司条目），是缺口的主要来源。</p>
   <div class="scroll"><table id="eraTbl"></table></div>
 
+  <h3>3.1　为什么 2005–2012 的 GAIM 这么低——三层对照</h3>
+  <p class="note" id="reconNote"></p>
+  <div class="scroll"><table id="reconTbl"></table></div>
+  <p class="note" id="reconWhy"></p>
+
   <h2>四、逐公司</h2>
   <div class="small" id="sm"></div>
 
@@ -635,6 +640,53 @@ function renderStatic() {
       + `<td>${r.gaim.toFixed(2)}%</td>`
       + `<td>${r.aisc == null ? `<span title="AISC 覆盖仅 ${r.aisc_cov}% 的收入，不足以与左侧 GAIM 比较">—</span>` : r.aisc.toFixed(2) + '%'}</td>`
       + `<td>${r.gap == null ? '—' : r.gap.toFixed(1) + 'pt'}</td></tr>`).join('') + '</tbody>';
+
+  // ---- 3.1 three-layer reconciliation ------------------------------------
+  document.getElementById('reconNote').innerHTML =
+    `金价从 430 涨到 1670 的那八年，全成本利润率贴着零——这看起来和行情矛盾，`
+    + `矛盾的是「行情」指的是哪一层。<b>L0a 分部会计利润率</b>是市场当年交易的数；`
+    + `<b>L0b 归属净利率</b>是净利润÷总收入，直接从利润表读，<u>完全不碰 GAIM 的成本栈</u>。`
+    + `两者在 2005–2008 相差 <b>25.8 个百分点</b>，而 GAIM 落在<b>后者</b>旁边。`
+    + `L0b 是一次真正独立的验算：如果 GAIM 的资本开支或现金税算错一倍，它会和 L0b 分道扬镳。`;
+
+  const rc = document.getElementById('reconTbl');
+  rc.innerHTML = '<thead><tr><th>时代</th><th>L0a 分部会计</th><th>L0b 归属净利</th>'
+    + '<th>加回已提取减值</th><th>GAIM</th><th>GAIM−L0b<sup>*</sup></th>'
+    + '<th>营业成本 $/oz</th><th>资本开支 $/oz</th><th>到手金价 $/oz</th></tr></thead><tbody>'
+    + D.recon.map(r => {
+        const base = r.impCo === r.nCo ? r.l0b_ex : r.l0b;   // see footnote
+        const d = r.gaim - base;
+        return `<tr><td>${r.label}</td>`
+          + `<td>${r.l0a.toFixed(1)}%</td>`
+          + `<td>${r.l0b.toFixed(1)}%</td>`
+          + `<td>${r.l0b_ex.toFixed(1)}%${r.impCo < r.nCo
+              ? ` <span style="color:var(--warn)" title="减值只在 ${r.impCo}/${r.nCo} 家上提取到，空白不等于零，所以这是下限而非该时代的实际值">下限 ${r.impCo}/${r.nCo} 家</span>` : ''}</td>`
+          + `<td><b>${r.gaim.toFixed(1)}%</b></td>`
+          + `<td>${d > 0 ? '+' : ''}${d.toFixed(1)}pt</td>`
+          + `<td>${r.opoz.toFixed(0)}</td><td>${r.cxoz.toFixed(0)}</td><td>${r.pxoz.toFixed(0)}</td></tr>`;
+      }).join('') + '</tbody>';
+
+  document.getElementById('reconWhy').innerHTML =
+    `<sup>*</sup> 减值全覆盖的时代与「加回减值后」比，覆盖不全的与 L0b 原值比——`
+    + `拿一个下限去算差会把差算大。<br><br>`
+    + `<b>读法一：GAIM 从来不跟 L0a 走，它跟 L0b 走。</b>五个时代跨 21 年，`
+    + `GAIM 与净利率的差在 <b>0.2 到 2.8 个百分点</b>之间；而 L0a 在每一个时代都高出 20–30 个百分点。`
+    + `<b>市场看的那一层，作为「股东能拿到多少」的度量，系统性地乐观 20–30 点。</b><br><br>`
+    + `<b>读法二：差的符号就是资本周期。</b>2005–2008 GAIM 比净利率<b>低</b>（在建矿：`
+    + `资本开支 169 美元/盎司 远超同期折旧），2021–2026 GAIM 比净利率<b>高</b>（在收割：`
+    + `当年花的钱少于当年折旧掉的繁荣期资产）。GAIM 在花钱的当期全额扣资本开支、此后永不折旧，`
+    + `所以它在建设期低估、在投产后高估。<b>1.89% 严格回答的是「这八年卖金子收进来的现金，`
+    + `够不够覆盖这八年花出去的现金」——答案是勉强够。它不回答「这些资本开支是不是好投资」。</b><br><br>`
+    + `<b>读法三：成本涨得和金价一样快。</b>营业成本＋资本开支合计从 2005–2008 的 `
+    + `522 美元/盎司（金价 619）升到 2021–2026 的 1,630（金价 2,610）。`
+    + `前者占金价 84%，后者 62%——这 22 个百分点就是这条曲线从 1.9% 走到 22.0% 的全部来源，`
+    + `而它上面还压着公司管理费、勘探、现金税、净利息另外 12–17 个点。<br><br>`
+    + `<b>后一个问题的答案在减值里，但那串数字不完整，必须说清楚。</b>`
+    + `2013–2016 六家全覆盖、每个季度都有，合计 <b>324 亿美元</b>；`
+    + `2005–2012 每年只有 1–3 家能提取到减值，`
+    + `所以那两个时代的 <b>${D.recon[0].imp.toLocaleString()}</b> 与 `
+    + `<b>${D.recon[1].imp.toLocaleString()}</b> 百万美元都是<b>下限</b>，不是总额。`
+    + `即便如此：这些写掉的东西，正是 2005–2012 那笔资本开支建成的。`;
 
   const counts = Object.entries(D.gradeCounts).sort().map(([k, v]) => `${k} 级 ${v} 行`).join(' · ');
   document.getElementById('fidNote').innerHTML =
